@@ -1,4 +1,5 @@
 # तत्त्व — TATTVA
+
 ## Scientific Principles of ASTRAVERSA Ω
 
 ---
@@ -8,6 +9,7 @@
 This document records the scientific assumptions, mathematical simplifications, simulation principles, and known limitations of ASTRAVERSA Ω's computational models.
 
 Every model in ASTRAVERSA Ω is a simplification of reality. This document ensures that:
+
 1. No model is mistaken for research-grade accuracy.
 2. Every simplification is deliberate and documented.
 3. Future improvements have a clear starting point.
@@ -29,6 +31,7 @@ The galaxy is a procedural approximation of a barred/unbarred spiral galaxy, loo
 ```
 
 **Where:**
+
 - `r` = galactocentric radius (kpc)
 - `windingFactor` ∈ [0.4, 0.8] — controls spiral tightness
 - `scaleRadius` = 0.5 kpc — inner reference radius
@@ -47,9 +50,11 @@ Stars are scattered around the ideal spiral curve with Gaussian noise in the ang
 ```
 
 **Implementation:** Inverse CDF sampling.
+
 ```
 r = -scaleLength × ln(1 - u × (1 - exp(-rMax / scaleLength)))
 ```
+
 where `u ~ Uniform(0,1)`.
 
 This ensures more stars are generated toward the galactic center, reproducing the exponential disk profile observed in real spiral galaxies.
@@ -57,8 +62,9 @@ This ensures more stars are generated toward the galactic center, reproducing th
 ### Star Population Distribution
 
 Stars are distributed across three regions:
+
 | Region | Fraction | Method |
-|--------|----------|--------|
+| -------- | ---------- | -------- |
 | Central Bulge | ~15% | 3D Gaussian, wider vertical extent |
 | Spiral Arms | ~60% | Arm-following with Gaussian scatter |
 | Inter-arm / Field | ~25% | Exponential radial, uniform angular |
@@ -74,6 +80,7 @@ z ~ N(0, bulgeRadius × 0.4)
 ```
 
 **Parameters:**
+
 - `bulgeRadiusFraction` ∈ [0.08, 0.15] of galaxy radius
 - `bulgeVerticalScale` ∈ [1.5, 3.0] — thicker than the disk
 - `bulgeDensityMultiplier` ∈ [3, 6] — higher star density
@@ -81,12 +88,14 @@ z ~ N(0, bulgeRadius × 0.4)
 ### Vertical Distribution
 
 **Disk stars:** Thin Gaussian in Y.
+
 ```
 y ~ N(0, diskThickness × 0.15)  (arm stars)
 y ~ N(0, diskThickness × 0.2)   (field stars)
 ```
 
 **Bulge stars:** Wider Gaussian in Y.
+
 ```
 y ~ N(0, diskThickness × bulgeVerticalScale × 0.3)
 ```
@@ -96,7 +105,7 @@ This produces a thin disk with a thicker central bulge, consistent with the gene
 ### Galaxy Properties
 
 | Property | Range | Unit |
-|----------|-------|------|
+| ---------- | ------- | ------ |
 | Radius | 12 – 18 | kpc |
 | Disk thickness | 0.3 – 0.6 | kpc |
 | Age | 10 – 13.5 | Gyr |
@@ -136,7 +145,7 @@ This produces a thin disk with a thicker central bulge, consistent with the gene
 Clusters are placed preferentially along spiral arms with Gaussian scatter from the arm center.
 
 | Property | Range | Unit |
-|----------|-------|------|
+| ---------- | ------- | ------ |
 | Radius | 0.05 – 0.3 | kpc |
 | Population estimate | 100 – 10,000 | stars |
 | Count | 20 – 40 | per galaxy |
@@ -157,7 +166,7 @@ Clusters are placed preferentially along spiral arms with Gaussian scatter from 
 Representative stars are sampled with a weighted mass distribution approximating the initial mass function (IMF):
 
 | Spectral Class | Mass Range (M☉) | Sampling Probability |
-|----------------|-----------------|---------------------|
+| ---------------- | ----------------- | --------------------- |
 | M | 0.08 – 0.45 | 30% |
 | K | 0.45 – 0.8 | 25% |
 | G | 0.8 – 1.04 | 25% (boosted for visibility) |
@@ -190,7 +199,7 @@ This distribution is intentionally biased toward visible/interesting star types 
 ### Quality Levels
 
 | Level | Star Count | Target Use |
-|-------|-----------|-----------|
+| ------- | ----------- | ----------- |
 | LOW | 8,000 | Lower-end hardware |
 | MEDIUM | 20,000 | Normal gaming laptop |
 | HIGH | 40,000 | Higher-end GPU |
@@ -210,11 +219,13 @@ This distribution is intentionally biased toward visible/interesting star types 
 ### Current Implementation: Simplified Newtonian Gravity
 
 **Formula:**
+
 ```
 F = G × m₁ × m₂ / (r² + ε²) × r̂
 ```
 
 **Where:**
+
 - `G` = 6.6743 × 10⁻¹¹ m³ kg⁻¹ s⁻² (gravitational constant)
 - `m₁, m₂` = masses of the two bodies (kg)
 - `r` = distance between bodies (m)
@@ -227,6 +238,7 @@ F = G × m₁ × m₂ / (r² + ε²) × r̂
 - **Not active at:** Galaxy scale (stars are static positions)
 
 ### Assumptions
+
 - Point-mass approximation
 - No relativistic corrections
 - No tidal forces
@@ -234,6 +246,7 @@ F = G × m₁ × m₂ / (r² + ε²) × r̂
 - Softening parameter prevents infinite forces at zero distance
 
 ### Known Limitations
+
 - Orbits may drift over very long simulation periods
 - No frame-dragging or gravitational lensing
 - No gravitational wave emission
@@ -245,6 +258,7 @@ F = G × m₁ × m₂ / (r² + ε²) × r̂
 ### Current Implementation: Velocity Verlet (Störmer-Verlet)
 
 **Algorithm:**
+
 ```
 x(t+dt) = x(t) + v(t)·dt + 0.5·a(t)·dt²
 a(t+dt) = F(x(t+dt)) / m
@@ -252,6 +266,7 @@ v(t+dt) = v(t) + 0.5·(a(t) + a(t+dt))·dt
 ```
 
 ### Known Limitations
+
 - Fixed timestep (no adaptive step size)
 - Energy drift over millions of orbits
 - Not suitable for highly eccentric orbits
@@ -261,7 +276,7 @@ v(t+dt) = v(t) + 0.5·(a(t) + a(t+dt))·dt
 ## Time System
 
 | Parameter | Value |
-|-----------|-------|
+| ----------- | ------- |
 | Internal unit | Seconds (SI) |
 | Clock independence | Frame-rate independent |
 | Substep max | 3,600 s (1 hour) |
@@ -276,12 +291,14 @@ v(t+dt) = v(t) + 0.5·(a(t) + a(t+dt))·dt
 ### Current Implementation: Mulberry32 PRNG
 
 **Properties:**
+
 - Period: ~2³²
 - Deterministic: same seed → same sequence
 - Fast: single multiplication per step
 - Hierarchical: `fork()` / `deriveSeed()` for child generators
 
 ### Hierarchical Seeding
+
 ```
 Universe Seed
   → Galaxy Seed (= universe seed)
@@ -291,6 +308,7 @@ Universe Seed
 ```
 
 ### Known Limitations
+
 - Period of 2³² may be insufficient for extremely large universes
 - Simple hash function for seed derivation; collision probability increases with hierarchy depth
 
@@ -305,8 +323,9 @@ Universe Seed
 **Temperature:** `T ≈ T☉ × (M/M☉)^0.6`
 
 ### Spectral Classification
+
 | Class | Mass Range (M☉) | Temp Range (K) | Color |
-|-------|-----------------|----------------|-------|
+| ------- | ----------------- | ---------------- | ------- |
 | O | 16 – 150 | 30,000 – 50,000 | Blue-white |
 | B | 2.1 – 16 | 10,000 – 30,000 | Blue-white |
 | A | 1.4 – 2.1 | 7,500 – 10,000 | White |
@@ -330,7 +349,7 @@ Universe Seed
 ## Scale Hierarchy
 
 | Scale | Represented Objects | Physics | Rendering |
-|-------|-------------------|---------|-----------|
+| ------- | ------------------- | --------- | ----------- |
 | Galaxy | Galaxy, clusters, stars (×20K) | None (static structure) | Points geometry |
 | Star System | Star, planets (×3–8) | Newtonian gravity, Verlet | Individual meshes |
 | Planet | Future: surface, atmosphere | Future | Future |
@@ -342,7 +361,7 @@ This hierarchy is essential for scalability. At each level, only the appropriate
 ## Constants Reference
 
 | Constant | Value | Unit |
-|----------|-------|------|
+| ---------- | ------- | ------ |
 | G | 6.6743 × 10⁻¹¹ | m³ kg⁻¹ s⁻² |
 | c | 2.998 × 10⁸ | m/s |
 | M☉ | 1.989 × 10³⁰ | kg |

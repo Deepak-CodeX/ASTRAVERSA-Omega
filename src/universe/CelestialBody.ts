@@ -45,6 +45,15 @@ export interface PlanetProperties {
 }
 
 /**
+ * Moon-specific properties (Mission 003).
+ */
+export interface MoonProperties {
+  orbitalRadius: number;  // m (semi-major axis around parent planet)
+  orbitalPeriod: number;  // seconds
+  parentId: string;       // ID of the parent planet
+}
+
+/**
  * A celestial body in the simulation.
  */
 export interface CelestialBody {
@@ -78,11 +87,22 @@ export interface CelestialBody {
   /** Seed used to generate this body (for reproducibility) */
   seed: number;
 
+  /**
+   * ID of the parent body for hierarchical reference frames (Mission 003).
+   * - Stars: undefined (root of the hierarchy)
+   * - Planets: ID of the parent star
+   * - Moons: ID of the parent planet
+   */
+  parentId?: string;
+
   /** Star-specific properties (only for STAR type) */
   starProperties?: StarProperties;
 
   /** Planet-specific properties (only for PLANET type) */
   planetProperties?: PlanetProperties;
+
+  /** Moon-specific properties (only for MOON type) */
+  moonProperties?: MoonProperties;
 }
 
 /**
@@ -98,8 +118,10 @@ export function createCelestialBody(params: {
   velocity?: Vector3;
   color: string;
   seed: number;
+  parentId?: string;
   starProperties?: StarProperties;
   planetProperties?: PlanetProperties;
+  moonProperties?: MoonProperties;
 }): CelestialBody {
   return {
     id: params.id,
@@ -112,7 +134,9 @@ export function createCelestialBody(params: {
     acceleration: Vector3.zero(),
     color: params.color,
     seed: params.seed,
+    parentId: params.parentId,
     starProperties: params.starProperties,
     planetProperties: params.planetProperties,
+    moonProperties: params.moonProperties,
   };
 }

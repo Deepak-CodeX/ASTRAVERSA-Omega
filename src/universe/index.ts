@@ -4,7 +4,7 @@
 
 export { SeededRandom } from './SeededRandom';
 export { CelestialBodyType, createCelestialBody } from './CelestialBody';
-export type { CelestialBody, StarProperties, PlanetProperties } from './CelestialBody';
+export type { CelestialBody, StarProperties, PlanetProperties, MoonProperties } from './CelestialBody';
 export { generateSolarSystem } from './SolarSystemGenerator';
 export type { SolarSystem } from './SolarSystemGenerator';
 export { Universe } from './Universe';
