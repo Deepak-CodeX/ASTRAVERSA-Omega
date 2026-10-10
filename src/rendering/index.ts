@@ -8,6 +8,15 @@ export { PlanetRenderer } from './PlanetRenderer';
 export { OrbitRenderer } from './OrbitRenderer';
 export { CelestialBodyRenderer } from './CelestialBodyRenderer';
 
-// Mission 002 — Galaxy Rendering
-export { GalaxyRenderer } from './GalaxyRenderer';
-export { GalaxyScene } from './GalaxyScene';
+// Mission 002 — Galaxy Rendering & Cinematic Observatory
+export {
+  GalaxyRenderer,
+  DEFAULT_LAYER_VISIBILITY,
+  type GalaxyLayerVisibility,
+} from './GalaxyRenderer';
+export {
+  GalaxyScene,
+  type CameraPreset,
+  type GalaxyTelemetry,
+} from './GalaxyScene';
+

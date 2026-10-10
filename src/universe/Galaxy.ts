@@ -27,6 +27,7 @@ import type { SpectralClass } from '../astronomy/stellar';
  */
 export const GalaxyType = {
   SPIRAL: 'SPIRAL',
+  BARRED_SPIRAL: 'BARRED_SPIRAL',
   ELLIPTICAL: 'ELLIPTICAL',
   IRREGULAR: 'IRREGULAR',
 } as const;
@@ -50,6 +51,110 @@ export interface SpiralArmParams {
   armWidth: number;
   /** How much stars cluster toward arm centers (0 = uniform, 1 = tight) */
   armDensity: number;
+}
+
+/**
+ * Detailed astronomical definition of an individual logarithmic spiral arm.
+ */
+export interface SpiralArmDefinition {
+  /** Astronomical arm designation (e.g. Scutum-Centaurus, Perseus, etc.) */
+  name: string;
+  /** Zero-based arm index */
+  armIndex: number;
+  /** Radial coordinate where the arm emerges from the bar tip (kpc) */
+  startRadius: number;
+  /** Angular coordinate where the arm emerges (radians) */
+  startAngle: number;
+  /** Pitch angle of the logarithmic spiral (radians, ~12-14 degrees) */
+  pitchAngleRad: number;
+  /** Radial expansion coefficient controlling width broadening with radius */
+  widthExpansionCoeff: number;
+  /** Whether this is a major density-wave arm or a secondary/spur structure */
+  isMajor: boolean;
+}
+
+/**
+ * Parameters controlling the central stellar bar.
+ */
+export interface BarParams {
+  /** Semi-major axis length of the central bar (kpc) */
+  length: number;
+  /** Semi-minor axis width of the central bar (kpc) */
+  width: number;
+  /** Vertical thickness / scale height of the bar (kpc) */
+  thickness: number;
+  /** Position angle of the bar relative to the galactic X-axis (radians) */
+  angle: number;
+  /** Density enhancement multiplier for stars within the bar region */
+  densityMultiplier: number;
+}
+
+/**
+ * Dual-component thin and thick stellar disk parameters.
+ */
+export interface DiskStructureParams {
+  /** Thin disk vertical scale height (kpc), predominantly young Population I stars */
+  thinScaleHeight: number;
+  /** Thick disk vertical scale height (kpc), predominantly older Population II stars */
+  thickScaleHeight: number;
+  /** Radial exponential scale length (kpc) */
+  radialScaleLength: number;
+  /** Fraction of disk stars residing in the thick disk (0 to 1) */
+  thickDiskFraction: number;
+  /** Outer boundary radius of main stellar disk body (kpc, 500,000 ly diameter = ~76.65 kpc radius) */
+  mainDiskRadiusKpc: number;
+  /** Main stellar disk body diameter in light-years */
+  mainDiskDiameterLy: number;
+  /** Outer boundary radius of the extended diffuse stellar halo (kpc) */
+  extendedHaloRadiusKpc: number;
+  /** Extended diffuse stellar halo diameter in light-years */
+  extendedHaloDiameterLy: number;
+}
+
+/**
+ * Supermassive Black Hole at the galactic nucleus (ANANTARA A*).
+ */
+export interface SupermassiveBlackHole {
+  /** Unique identifier */
+  id: string;
+  /** Display name (e.g. "ANANTARA A*") */
+  name: string;
+  /** Mass in solar masses (M☉) */
+  massSolar: number;
+  /** Mass in SI kilograms */
+  massKg: number;
+  /** Schwarzschild radius (2GM/c²) in meters */
+  schwarzschildRadiusMeters: number;
+  /** Schwarzschild radius in kilometers */
+  schwarzschildRadiusKm: number;
+  /** Schwarzschild radius in AU */
+  schwarzschildRadiusAU: number;
+  /** Dimensionless Kerr spin parameter a* (-1 to 1, ~0.94 for relativistic frame-dragging) */
+  spinParameter: number;
+  /** Accretion flow regime */
+  accretionState: 'quiescent' | 'active' | 'radiatively-inefficient';
+  /** Gravitational sphere of influence radius (pc) */
+  sphereOfInfluencePc: number;
+  /** Nuclear Star Cluster stellar velocity dispersion (km/s) */
+  velocityDispersionKms: number;
+  /** Relativistic radio jet length (kpc, separate from stellar diameter) */
+  jetLengthKpc?: number;
+  /** Estimated synchrotron jet mechanical power (Watts) */
+  jetLuminosityWatts?: number;
+  /** Terminal radio lobe diffuse radius (kpc) */
+  radioLobeRadiusKpc?: number;
+  /** Relativistic photon sphere radius in AU (1.5 * rs) */
+  photonRingAU?: number;
+  /** Theoretical Eddington accretion luminosity (Watts) */
+  eddingtonLuminosityWatts?: number;
+  /** Explanatory note clarifying optical marker vs physical microscopic Schwarzschild radius */
+  visualScaleNotice?: string;
+  /** Flag denoting parameters are fictional simulation settings */
+  isFictionalSimulation?: boolean;
+  /** Position in galactic coordinates (kpc), [0, 0, 0] */
+  x: number;
+  y: number;
+  z: number;
 }
 
 /**
@@ -183,8 +288,14 @@ export interface Galaxy {
   /** Unique identifier */
   id: string;
 
-  /** Display name */
+  /** Display name (e.g. ANANTARA α) */
   name: string;
+
+  /** Optional editable display name */
+  displayName?: string;
+
+  /** Generation algorithm schema version (1: legacy spiral, 2: barred spiral Milky Way class) */
+  generationVersion?: number;
 
   /** Master seed for this galaxy */
   seed: number;
@@ -192,7 +303,7 @@ export interface Galaxy {
   /** Galaxy morphological type */
   type: GalaxyType;
 
-  /** Galaxy radius (kiloparsecs) */
+  /** Main stellar disk body radius (kiloparsecs, e.g. ~76.65 kpc for 500,000 ly diameter) */
   radius: number;
 
   /** Galaxy disk thickness at center (kiloparsecs) */
@@ -209,6 +320,18 @@ export interface Galaxy {
 
   /** Spiral arm parameters */
   spiralArms: SpiralArmParams;
+
+  /** Detailed astronomical 4-arm definitions */
+  spiralArmDefinitions?: SpiralArmDefinition[];
+
+  /** Central stellar bar parameters */
+  bar?: BarParams;
+
+  /** Dual thin/thick disk and halo structure parameters */
+  diskStructure?: DiskStructureParams;
+
+  /** Central Supermassive Black Hole (ANANTARA A*) */
+  nucleus?: SupermassiveBlackHole;
 
   /** Central bulge parameters */
   bulge: BulgeParams;
@@ -232,6 +355,7 @@ export interface Galaxy {
  */
 export const ViewLevel = {
   GALAXY: 'GALAXY',
+  NUCLEUS: 'NUCLEUS',
   CLUSTER: 'CLUSTER',
   STAR: 'STAR',
   SYSTEM: 'SYSTEM',

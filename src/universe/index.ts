@@ -16,8 +16,12 @@ export type {
   GalaxyStar,
   StarCluster,
   SpiralArmParams,
+  SpiralArmDefinition,
+  BarParams,
+  DiskStructureParams,
+  SupermassiveBlackHole,
   BulgeParams,
   NavigationState,
 } from './Galaxy';
-export { generateGalaxy } from './GalaxyGenerator';
+export { generateGalaxy, recalculateSupermassiveBlackHole } from './GalaxyGenerator';
 export type { GalaxyGenerationConfig } from './GalaxyGenerator';

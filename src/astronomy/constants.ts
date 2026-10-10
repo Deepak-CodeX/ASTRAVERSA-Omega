@@ -19,8 +19,11 @@
 /** Gravitational constant (m³ kg⁻¹ s⁻²) */
 export const G = 6.6743e-11;
 
-/** Speed of light (m/s) */
-export const C = 2.998e8;
+/** Exact speed of light in vacuum (m/s) */
+export const SPEED_OF_LIGHT = 299792458;
+
+/** Alias for speed of light */
+export const C = SPEED_OF_LIGHT;
 
 /** Stefan-Boltzmann constant (W m⁻² K⁻⁴) */
 export const STEFAN_BOLTZMANN = 5.670374419e-8;
@@ -61,20 +64,20 @@ export const JUPITER_RADIUS = 6.9911e7;
 // Distance Units
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/** Astronomical Unit in meters */
-export const AU = 1.496e11;
+/** Astronomical Unit in meters (IAU 2012 exact definition: 149597870700 m) */
+export const AU = 1.495978707e11;
 
-/** Light year in meters */
-export const LIGHT_YEAR = 9.461e15;
+/** Light year in meters (Julian year * c) */
+export const LIGHT_YEAR = 9.4607304725808e15;
 
 /** Parsec in meters */
-export const PARSEC = 3.086e16;
+export const PARSEC = 3.08567758149137e16;
 
 /** Kiloparsec in meters */
 export const KILOPARSEC = PARSEC * 1000;
 
-/** Kiloparsec in light years */
-export const KILOPARSEC_LY = 3261.56;
+/** Kiloparsec in light years (1 kpc = 3261.563777 ly) */
+export const KILOPARSEC_LY = 3261.563777;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Time Units
@@ -139,3 +142,41 @@ export function secondsToYears(seconds: number): number {
 export function yearsToSeconds(years: number): number {
   return years * SECONDS_PER_YEAR;
 }
+
+/**
+ * Convert kiloparsecs to light-years
+ */
+export function kpcToLightYears(kpc: number): number {
+  return kpc * KILOPARSEC_LY;
+}
+
+/**
+ * Convert light-years to kiloparsecs
+ */
+export function lightYearsToKpc(ly: number): number {
+  return ly / KILOPARSEC_LY;
+}
+
+/**
+ * Calculate Schwarzschild radius in meters from solar masses:
+ * r_s = 2 * G * M / c^2
+ */
+export function schwarzschildRadiusMeters(massSolar: number): number {
+  const massKg = massSolar * SOLAR_MASS;
+  return (2 * G * massKg) / (C * C);
+}
+
+/**
+ * Calculate Schwarzschild radius in kilometers from solar masses
+ */
+export function schwarzschildRadiusKm(massSolar: number): number {
+  return schwarzschildRadiusMeters(massSolar) / 1000;
+}
+
+/**
+ * Calculate Schwarzschild radius in Astronomical Units (AU) from solar masses
+ */
+export function schwarzschildRadiusAU(massSolar: number): number {
+  return schwarzschildRadiusMeters(massSolar) / AU;
+}
+

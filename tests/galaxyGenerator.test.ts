@@ -7,12 +7,23 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { generateGalaxy } from '../src/universe/GalaxyGenerator';
+import { generateGalaxy, recalculateSupermassiveBlackHole } from '../src/universe/GalaxyGenerator';
 import { generateSolarSystem } from '../src/universe/SolarSystemGenerator';
 import { Universe } from '../src/universe/Universe';
 import { GalaxyType, ViewLevel } from '../src/universe/Galaxy';
 import type { QualityLevel } from '../src/universe/Galaxy';
 import { CelestialBodyType } from '../src/universe/CelestialBody';
+import {
+  kpcToLightYears,
+  lightYearsToKpc,
+  schwarzschildRadiusMeters,
+  schwarzschildRadiusKm,
+  schwarzschildRadiusAU,
+  GRAVITATIONAL_CONSTANT,
+  SPEED_OF_LIGHT,
+  SOLAR_MASS,
+  AU,
+} from '../src/astronomy/constants';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 1. Galaxy Generation
@@ -25,8 +36,9 @@ describe('Galaxy Generation', () => {
     expect(galaxy.id).toBe('galaxy-42');
     expect(galaxy.name).toBeDefined();
     expect(galaxy.name.length).toBeGreaterThan(0);
+    expect(galaxy.displayName).toBe('ANANTARA α');
     expect(galaxy.seed).toBe(42);
-    expect(galaxy.type).toBe(GalaxyType.SPIRAL);
+    expect(galaxy.type).toBe(GalaxyType.BARRED_SPIRAL);
     expect(galaxy.radius).toBeGreaterThan(0);
     expect(galaxy.thickness).toBeGreaterThan(0);
     expect(galaxy.estimatedPopulation).toBeGreaterThan(0);
@@ -38,8 +50,7 @@ describe('Galaxy Generation', () => {
   it('generates spiral arm parameters', () => {
     const galaxy = generateGalaxy(42);
 
-    expect(galaxy.spiralArms.armCount).toBeGreaterThanOrEqual(2);
-    expect(galaxy.spiralArms.armCount).toBeLessThanOrEqual(4);
+    expect(galaxy.spiralArms.armCount).toBe(4);
     expect(galaxy.spiralArms.windingFactor).toBeGreaterThan(0);
     expect(galaxy.spiralArms.armWidth).toBeGreaterThan(0);
     expect(galaxy.spiralArms.armDensity).toBeGreaterThan(0);
@@ -55,7 +66,15 @@ describe('Galaxy Generation', () => {
   });
 
   it('generates physically plausible galaxy properties', () => {
-    for (let seed = 0; seed < 10; seed++) {
+    // Canonical ANANTARA α (seed 42)
+    const canonical = generateGalaxy(42);
+    expect(canonical.radius).toBeGreaterThan(70);
+    expect(canonical.radius).toBeLessThan(80);
+    expect(canonical.diskStructure?.mainDiskDiameterLy).toBe(500000);
+    expect(canonical.diskStructure?.extendedHaloDiameterLy).toBeCloseTo(750000, 1);
+
+    // Generic galaxies (seeds other than 42)
+    for (let seed = 1; seed < 10; seed++) {
       const galaxy = generateGalaxy(seed);
 
       // Radius should be in plausible range (kpc)
@@ -556,7 +575,200 @@ describe('Quality Levels', () => {
 
       expect(galaxy.stars.length).toBeGreaterThan(0);
       expect(galaxy.clusters.length).toBeGreaterThan(0);
-      expect(galaxy.type).toBe(GalaxyType.SPIRAL);
+      expect(galaxy.type).toBe(GalaxyType.BARRED_SPIRAL);
     }
   });
 });
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 14. ANANTARA α Scientific Reconstruction & Astrophysics
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+describe('ANANTARA α Scientific Reconstruction & Astrophysics', () => {
+  const galaxy = generateGalaxy(42);
+
+  describe('Identity and Dimensions (Constraint 1 & 8)', () => {
+    it('has exact display name ANANTARA α and immutable ID galaxy-42', () => {
+      expect(galaxy.displayName).toBe('ANANTARA α');
+      expect(galaxy.id).toBe('galaxy-42');
+      expect(galaxy.generationVersion).toBe(2);
+      expect(galaxy.type).toBe(GalaxyType.BARRED_SPIRAL);
+    });
+
+    it('targets 500,000-light-year main stellar disk diameter', () => {
+      expect(galaxy.diskStructure).toBeDefined();
+      expect(galaxy.diskStructure?.mainDiskDiameterLy).toBe(500000);
+      // Main disk radius R = 250,000 ly in kpc
+      const expectedRadiusKpc = lightYearsToKpc(250000);
+      expect(galaxy.diskStructure?.mainDiskRadiusKpc).toBeCloseTo(expectedRadiusKpc, 4);
+      expect(galaxy.radius).toBeCloseTo(expectedRadiusKpc, 4);
+      expect(galaxy.radius).toBeGreaterThan(76.6);
+      expect(galaxy.radius).toBeLessThan(76.7);
+    });
+
+    it('models extended stellar halo separately (750,000 ly diameter)', () => {
+      expect(galaxy.diskStructure?.extendedHaloDiameterLy).toBeCloseTo(750000, 1);
+      const expectedHaloRadiusKpc = lightYearsToKpc(375000);
+      expect(galaxy.diskStructure?.extendedHaloRadiusKpc).toBeCloseTo(expectedHaloRadiusKpc, 4);
+      expect(galaxy.diskStructure?.extendedHaloRadiusKpc).toBeGreaterThan(galaxy.radius);
+    });
+
+    it('models dual thin and thick stellar disk components', () => {
+      expect(galaxy.diskStructure?.thinScaleHeight).toBe(1.5);
+      expect(galaxy.diskStructure?.thickScaleHeight).toBe(4.5);
+      expect(galaxy.diskStructure?.thickDiskFraction).toBe(0.15);
+    });
+  });
+
+  describe('Astrophysical Unit Conversions (Constraint 2)', () => {
+    it('accurately converts between kpc and light-years', () => {
+      // 1 pc = 3.261563777 ly -> 1 kpc = 3261.563777 ly
+      expect(kpcToLightYears(1.0)).toBeCloseTo(3261.563777, 3);
+      expect(lightYearsToKpc(3261.563777)).toBeCloseTo(1.0, 4);
+
+      // 500,000 ly to kpc
+      const kpc500k = lightYearsToKpc(500000);
+      expect(kpc500k).toBeCloseTo(153.3007, 2);
+      expect(kpcToLightYears(kpc500k)).toBeCloseTo(500000, 1);
+    });
+
+    it('independently validates Schwarzschild radius derivation: r_s = 2GM/c²', () => {
+      const bhMassSolar = 4.154e6;
+      const massKg = bhMassSolar * SOLAR_MASS;
+
+      // Independent manual calculation with raw physical constants
+      const G_RAW = 6.6743e-11;
+      const C_RAW = 299792458;
+      const independentRsMeters = (2 * G_RAW * massKg) / (C_RAW * C_RAW);
+      const independentRsKm = independentRsMeters / 1000;
+      const independentRsAU = independentRsMeters / AU;
+
+      // Function under test
+      const derivedMeters = schwarzschildRadiusMeters(bhMassSolar);
+      const derivedKm = schwarzschildRadiusKm(bhMassSolar);
+      const derivedAU = schwarzschildRadiusAU(bhMassSolar);
+
+      expect(derivedMeters).toBeCloseTo(independentRsMeters, -2);
+      expect(derivedKm).toBeCloseTo(independentRsKm, 0);
+      expect(derivedAU).toBeCloseTo(independentRsAU, 5);
+
+      // Verify physical magnitude for ANANTARA A* (4.154M M☉)
+      // rs ~ 1.2271e10 m = 12.271M km ~ 0.0820 AU
+      expect(derivedKm).toBeGreaterThan(12.2e6);
+      expect(derivedKm).toBeLessThan(12.3e6);
+      expect(derivedAU).toBeGreaterThan(0.081);
+      expect(derivedAU).toBeLessThan(0.083);
+    });
+
+    it('attaches verified supermassive black hole nucleus ANANTARA A*', () => {
+      const smbh = galaxy.nucleus;
+      expect(smbh).toBeDefined();
+      expect(smbh?.name).toBe('ANANTARA A*');
+      expect(smbh?.massSolar).toBe(4.154e6);
+      expect(smbh?.spinParameter).toBe(0.94);
+      expect(smbh?.schwarzschildRadiusKm).toBeCloseTo(12.2714e6, -3);
+      expect(smbh?.schwarzschildRadiusAU).toBeCloseTo(0.08201, 3);
+      expect(smbh?.accretionState).toBe('quiescent');
+      expect(smbh?.jetLengthKpc).toBeDefined();
+      expect(smbh?.radioLobeRadiusKpc).toBeDefined();
+      expect(smbh?.isFictionalSimulation).toBe(true);
+      expect(smbh?.visualScaleNotice).toBeDefined();
+    });
+
+    it('supports dynamic reconfiguration of SMBH mass (configurable mass simulation)', () => {
+      // 1. Sgr A* analogue (4.154M M☉)
+      const base = recalculateSupermassiveBlackHole(4.154e6);
+      expect(base.schwarzschildRadiusAU).toBeCloseTo(0.08201, 3);
+      expect(base.photonRingAU).toBeCloseTo(0.12301, 3);
+
+      // 2. Colossal IC 1101 analogue (40B M☉)
+      const colossal = recalculateSupermassiveBlackHole(4.0e10);
+      expect(colossal.massSolar).toBe(4.0e10);
+      // rs scales linearly: 4e10 / 4.154e6 * 0.08201 ~ 789.7 AU
+      expect(colossal.schwarzschildRadiusAU).toBeGreaterThan(700);
+      expect(colossal.schwarzschildRadiusAU).toBeLessThan(900);
+      expect(colossal.photonRingAU).toBeCloseTo(colossal.schwarzschildRadiusAU * 1.5, 1);
+      expect(colossal.accretionState).toBe('active');
+      expect(colossal.eddingtonLuminosityWatts).toBeGreaterThan(base.eddingtonLuminosityWatts!);
+
+      // 3. Update live on Universe instance
+      const universe = new Universe(42);
+      universe.generateGalaxy();
+      expect(universe.nucleus?.massSolar).toBe(4.154e6);
+
+      const updated = universe.setNucleusMass(1.0e9);
+      expect(updated).not.toBeNull();
+      expect(universe.nucleus?.massSolar).toBe(1.0e9);
+      expect(universe.nucleus?.schwarzschildRadiusAU).toBeGreaterThan(15);
+    });
+  });
+
+  describe('Triaxial Stellar Bar & 4 Logarithmic Spiral Arms (Constraint 5)', () => {
+    it('defines triaxial stellar bar parameters', () => {
+      const bar = galaxy.bar;
+      expect(bar).toBeDefined();
+      expect(bar?.length).toBeCloseTo(19.929, 2);
+      expect(bar?.width).toBeCloseTo(6.576, 2);
+      expect(bar?.thickness).toBe(3.5);
+      expect(bar?.angle).toBeCloseTo(0.48869, 4); // ~28 degrees
+      expect((bar!.angle * 180) / Math.PI).toBeCloseTo(28.0, 1);
+    });
+
+    it('defines 4 continuous logarithmic spiral arms starting from bar ends', () => {
+      const arms = galaxy.spiralArmDefinitions;
+      expect(arms).toBeDefined();
+      expect(arms).toHaveLength(4);
+
+      const expectedNames = [
+        'Scutum-Centaurus Arm',
+        'Perseus Arm',
+        'Sagittarius-Carina Arm',
+        'Norma-Outer Arm',
+      ];
+
+      for (let i = 0; i < 4; i++) {
+        expect(arms![i].name).toBe(expectedNames[i]);
+        expect(arms![i].pitchAngleRad).toBeGreaterThan((11.0 * Math.PI) / 180);
+        expect(arms![i].pitchAngleRad).toBeLessThan((14.0 * Math.PI) / 180);
+        expect(arms![i].startRadius).toBeGreaterThan(12.0);
+        expect(arms![i].startRadius).toBeLessThanOrEqual(20.0);
+        expect(arms![i].widthExpansionCoeff).toBeGreaterThan(0);
+      }
+    });
+  });
+
+  describe('Preservation of Determinism & Downstream Integration (Constraint 3)', () => {
+    it('preserves star seeds, names, and solar system drill-down integrity', () => {
+      const star = galaxy.stars[0];
+      expect(star.id).toBe('gs-42-0');
+      expect(star.seed).toBeDefined();
+
+      const universe = new Universe(42);
+      universe.generateGalaxy();
+      const system = universe.enterStarSystem(0);
+
+      expect(system).toBeDefined();
+      expect(system?.star).toBeDefined();
+      expect(universe.activeStar?.name).toBe(star.name);
+      expect(universe.viewLevel).toBe(ViewLevel.SYSTEM);
+
+      universe.exitStarSystem();
+      expect(universe.viewLevel).toBe(ViewLevel.GALAXY);
+    });
+
+    it('ensures separate PRNG forks prevent cross-stream desynchronization', () => {
+      const g1 = generateGalaxy(42);
+      const g2 = generateGalaxy(42);
+
+      expect(g1.stars.length).toBe(g2.stars.length);
+      for (let i = 0; i < 50; i++) {
+        expect(g1.stars[i].seed).toBe(g2.stars[i].seed);
+        expect(g1.stars[i].name).toBe(g2.stars[i].name);
+        expect(g1.stars[i].x).toBe(g2.stars[i].x);
+        expect(g1.stars[i].y).toBe(g2.stars[i].y);
+        expect(g1.stars[i].z).toBe(g2.stars[i].z);
+      }
+    });
+  });
+});
+

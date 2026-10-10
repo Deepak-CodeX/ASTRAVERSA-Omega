@@ -44,15 +44,20 @@ ASTRAVERSA Ω follows a strict separation of concerns across six subsystems. The
 ```
 Universe (seed)
   ↓
-Galaxy (generated from universe seed)
+Galaxy (ANANTARA α — 500k ly main stellar-body disk, 750k ly halo)
   ↓
-StarCluster[] (deterministic from galaxy)
-  ↓
-GalaxyStar[] (lightweight representation)
-  ↓ (on selection)
-SolarSystem (generated from star seed)
-  ↓
-CelestialBody[] (star + planets with physics state)
+  ├── SupermassiveBlackHole (ANANTARA A* at r = 0, configurable mass 4.154M to 40B M☉)
+  │     ├── AccretionDisk (4.8k particles, Keplerian rotation shader, Doppler beaming)
+  │     └── RelativisticJets (Bipolar collimated cones, standing shocks, synchrotron lobes)
+  ├── BarStructure (Triaxial bar, a = 19.93 kpc, b = 6.58 kpc, 28°)
+  ├── SpiralArm[] (4 continuous arms: Scutum-Centaurus, Perseus, Norma, Sagittarius)
+  ├── DiskStructure (Thin scale 1.5 kpc, Thick scale 4.5 kpc)
+  ├── StarCluster[] (deterministic from galaxy)
+  └── GalaxyStar[] (lightweight representation)
+        ↓ (on selection)
+      SolarSystem (generated from star seed)
+        ↓
+      CelestialBody[] (star + planets with physics state)
 ```
 
 ---
@@ -96,9 +101,9 @@ CelestialBody[] (star + planets with physics state)
 | `SeededRandom` | Deterministic PRNG with hierarchical seed derivation |
 | `CelestialBody` | Core data structure for all celestial objects (with physics state) |
 | `SolarSystemGenerator` | Procedural star + planet generation from seed |
-| `Galaxy` | Domain model for galaxies, clusters, and lightweight stars |
-| `GalaxyGenerator` | Procedural spiral galaxy generation from seed |
-| `Universe` | Top-level container, navigation, and generation entry point |
+| `Galaxy` | Domain model for galaxies, clusters, lightweight stars, and SMBH with radio jets |
+| `GalaxyGenerator` | Procedural SBbc barred spiral galaxy generation from seed (500k ly disk, 750k ly halo, triaxial bar, 4 continuous arms, dual disks, ANANTARA A* SMBH with `recalculateSupermassiveBlackHole`) |
+| `Universe` | Top-level container, navigation, view level management, generation entry point, and `setNucleusMass` runtime mass reconfiguration |
 
 **Dependencies:** Physics (Vector3), Astronomy (constants, stellar, planetary)
 
@@ -130,8 +135,11 @@ CelestialBody[] (star + planets with physics state)
 
 | Component | Responsibility |
 |-----------|---------------|
-| `GalaxyScene` | R3F canvas, camera, environment for galaxy-scale view |
-| `GalaxyRenderer` | Stars (Points + custom shaders), core glow, dust field |
+| `GalaxyScene` | R3F canvas, camera, 9-waypoint interpolation (including 'bar', 'nucleus', and 'jets'), live telemetry, cosmic environment |
+| `GalaxyRenderer` | Layered GPU rendering: dual-profile stellar shader, golden bar population, leading bar dust shock lanes, H II nurseries, halo, and 7 layer visibility toggles (`disk`, `dust`, `halo`, `bulge`, `bar`, `accretion`, `jets`) |
+| `GalacticNucleusRenderer` | Relativistic nucleus container: event horizon shadow sphere, luminous photon ring, interactive reticle/hit-testing, and child high-energy renderers |
+| `AccretionDiskRenderer` | 4,800-particle Keplerian differentially rotating accretion disk with Doppler blue/redshift shader and thermal gradient |
+| `RelativisticJetsRenderer` | Collimated bipolar cones along $\pm Y$ with longitudinal standing shocks and extended terminal synchrotron radio lobes |
 | `Scene` | R3F canvas, camera, environment for solar system view |
 | `StarRenderer` | Star visualization (emissive sphere + glow + light) |
 | `PlanetRenderer` | Planet visualization (sphere + selection indicator) |
@@ -143,8 +151,12 @@ CelestialBody[] (star + planets with physics state)
 **Critical Rule:** Rendering components read simulation state but NEVER modify it.
 
 **Rendering Strategy:**
-- Galaxy: `Points` geometry with custom `ShaderMaterial` (single draw call for 20K+ stars)
+- Galaxy: Layered `Points` geometries with custom `ShaderMaterial`s (dual-profile diffraction core + airy halo, leading shock dust absorption, H II emission nebulae, Population II halo)
+- Galactic Nucleus: Central black shadow sphere ($r = 1.0$), photon orbit boundary ring ($r = 1.5$), Doppler-beamed gradient accretion disk, and selectable raycasting reticle
+- Accretion Disk: Custom shader with $\Omega(r) \propto r^{-1.25}$, orbital phase angle rotation, and Doppler color enhancement
+- Relativistic Jets & Radio Lobes: Collimated cone geometry with standing shock pulses and diffuse outer lobes
 - Solar System: Individual `<mesh>` elements per body (acceptable for <15 objects)
+- Observatory: Cinematic camera waypoint ease-out transitions, 7-layer visibility toggles, and real-time telemetry (distance, rotation speed, FPS)
 
 ---
 
@@ -154,9 +166,11 @@ CelestialBody[] (star + planets with physics state)
 
 | Component | Responsibility |
 |-----------|---------------|
-| `App` | Application shell, navigation state, view routing |
+| `App` | Application shell, navigation state, view routing, nucleus mass reconfiguration handler |
 | `TimeControls` | Speed/pause controls, time display (system view only) |
-| `GalaxyInfoPanel` | Unified info panel for galaxy/cluster/star/body selection |
+| `GalaxyInfoPanel` | Unified info panel with 9 waypoint jumps (including RADIO JETS), 7 layer toggles, SMBH mass presets (4.15M, 50M, 1.0B, 40B), full physical metadata readouts ($r_s$, $r_{\text{ph}}$, $L_{\text{Edd}}$, $\sigma$, $r_{\text{infl}}$, radio jet span), and scale separation callout notices |
+
+**Dependencies:** Engine, Universe, Rendering
 
 **Dependencies:** Engine, Universe, Rendering
 
@@ -234,6 +248,11 @@ Universe Seed (42)
     → Star Seed (derived via fork(2000).fork(region).fork(starIndex))
       → Solar System Seed (= Star Seed, passed to generateSolarSystem)
         → Planet Seed (derived via fork(planetIndex))
+    → Extended Halo Seed (isolated via fork(1500))
+    → Spiral Arm Geometry Seed (isolated via fork(1600))
+    → Dust Shock Lanes Seed (isolated via fork(1700))
+    → H II Starburst Seed (isolated via fork(1800))
+    → Nucleus & SMBH Seed (isolated via fork(1900))
 ```
 
 ---

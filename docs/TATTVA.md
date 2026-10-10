@@ -16,125 +16,134 @@ Every model in ASTRAVERSA Ω is a simplification of reality. This document ensur
 
 ---
 
-## Galaxy Model (Mission 002)
+## Galaxy Model — ANANTARA α (Colossal Barred Spiral)
 
-### Current Implementation: Simplified Spiral Galaxy
+### Galaxy Identity, Classification, and Scale Inspiration
 
-The galaxy is a procedural approximation of a barred/unbarred spiral galaxy, loosely inspired by Milky Way proportions but NOT a reconstruction.
+The primary galactic system in ASTRAVERSA Ω is **ANANTARA α** (canonical seed `42`, immutable identifier `galaxy-42`, formerly referenced as Orion Gate in early prototype iterations). It is modeled as a colossal SBbc barred spiral galaxy. Its morphological design draws from Milky Way barred spiral dynamics (Bland-Hawthorn & Gerhard 2016, Reid et al. 2019), while its colossal structural scale is inspired by giant galaxies such as IC 1101.
 
-### Spiral Arm Geometry
+> [!NOTE]
+> **Fictional Simulation Settings Disclaimer:**
+> All physical dimensions, stellar counts, black hole mass options, and structural parameters of ANANTARA α are fictional simulation parameters engineered for scientific visualization and cinematic exploration. They are not observational claims regarding any specific real-world celestial object.
 
-**Mathematical model:** Logarithmic spiral arms.
+---
 
-```
-θ(r) = windingFactor × ln(r / scaleRadius) + armPhaseOffset
-```
+### Three-Tier Extent Definitions and Spatial Separation
 
-**Where:**
+To maintain strict scientific and morphological clarity, ANANTARA α strictly separates luminous stellar bodies, diffuse halo envelopes, and circumgalactic plasma structures:
 
-- `r` = galactocentric radius (kpc)
-- `windingFactor` ∈ [0.4, 0.8] — controls spiral tightness
-- `scaleRadius` = 0.5 kpc — inner reference radius
-- `armPhaseOffset` = initial angular offset of each arm
+1. **Main Stellar-Body Extent (500,000 Light-Years / ~153.3 kpc Diameter):**
+   - **Galactocentric Radius ($R_{\text{disk}}$):** $\approx 76.65\text{ kpc}$ ($250,000\text{ ly}$).
+   - **Physical Definition:** The boundary of the luminous stellar disk containing $>95\%$ of active stellar mass, the dual exponential thin/thick disks, all four continuous spiral arms, the triaxial bar, and cold molecular gas / dust lanes.
+2. **Extended Stellar Halo Extent (750,000 Light-Years / ~230.0 kpc Diameter):**
+   - **Galactocentric Radius ($R_{\text{halo}}$):** $\approx 115.0\text{ kpc}$ ($375,000\text{ ly}$).
+   - **Physical Definition:** The diffuse spheroidal stellar envelope composed of ancient Population II stars, outer globular clusters, and tidal debris extending into the circumgalactic medium.
+3. **Relativistic Radio Jets & Synchrotron Lobes (Circumgalactic Plasma):**
+   - **Total Tip-to-Tip Extent:** $\approx 339,202\text{ ly}$ ($\approx 104\text{ kpc}$) at baseline $4.154\times 10^6 M_\odot$, dynamically scaling up to $\approx 782,774\text{ ly}$ ($\approx 240\text{ kpc}$) at $40\times 10^9 M_\odot$.
+   - **Scientific Separation Rule:** The radio lobes represent magnetized non-thermal relativistic plasma ejected along the rotational axis. **Under no circumstances is the galaxy's stellar body diameter claimed to include radio jets or lobes.**
 
-Stars are scattered around the ideal spiral curve with Gaussian noise in the angular direction, creating realistic arm width variation.
+---
 
-**Number of arms:** 2–4 (randomly determined per galaxy seed).
+### Central Triaxial Bar Structure
 
-### Radial Density Distribution
+ANANTARA α features a prominent triaxial galactic bar connecting the central bulge to the primary spiral arm origins:
 
-**Model:** Exponential disk profile.
+- **Semi-major axis ($a$):** $\approx 19.93\text{ kpc}$ ($65,000\text{ ly}$, $0.26 R_{\text{disk}}$).
+- **Semi-minor axis ($b$):** $\approx 6.58\text{ kpc}$ ($21,450\text{ ly}$, axis ratio $\approx 0.33$).
+- **Vertical scale height ($h_z$):** $3.5\text{ kpc}$ ($11,415\text{ ly}$).
+- **Position angle ($\phi$):** $28^\circ$ ($0.4887\text{ rad}$) relative to the galactocentric major axis.
+- **Population:** $\approx 16\%$ of total stellar mass, enriched in mature, metal-rich stars exhibiting golden/amber spectral profiles ($4,000 - 5,500\text{ K}$).
+- **Leading Shock Dust Lanes:** Dual offset extinction lanes aligned along the leading edges of the bar potential ($u \in [-a, a], v = \pm 0.45 b$), representing compressed interstellar gas transitioning into the inner Lindblad resonance.
 
-```
-ρ(r) ∝ exp(-r / scaleLength)
-```
+---
 
-**Implementation:** Inverse CDF sampling.
+### Four-Arm Continuous Spiral Architecture
 
-```
-r = -scaleLength × ln(1 - u × (1 - exp(-rMax / scaleLength)))
-```
-
-where `u ~ Uniform(0,1)`.
-
-This ensures more stars are generated toward the galactic center, reproducing the exponential disk profile observed in real spiral galaxies.
-
-### Star Population Distribution
-
-Stars are distributed across three regions:
-
-| Region | Fraction | Method |
-| -------- | ---------- | -------- |
-| Central Bulge | ~15% | 3D Gaussian, wider vertical extent |
-| Spiral Arms | ~60% | Arm-following with Gaussian scatter |
-| Inter-arm / Field | ~25% | Exponential radial, uniform angular |
-
-### Central Bulge
-
-**Model:** 3D Gaussian distribution.
+The disk features four grand-design logarithmic spiral arms with continuous tangential branching from the ends of the bar:
 
 ```
-x ~ N(0, bulgeRadius × 0.4)
-y ~ N(0, bulgeThickness × 0.3)
-z ~ N(0, bulgeRadius × 0.4)
+r(θ) = r_0 × exp(θ × tan(ψ))
 ```
 
-**Parameters:**
+1. **Scutum-Centaurus Arm:** Originates at positive bar tip ($\theta_0 \approx 28^\circ$, phase offset $0\text{ rad}$).
+2. **Perseus Arm:** Originates at negative bar tip ($\theta_0 \approx 208^\circ$, phase offset $\pi\text{ rad}$).
+3. **Norma-Outer Arm:** Inner branch with quadrant symmetry (phase offset $\pi/2\text{ rad}$).
+4. **Sagittarius-Carina Arm:** Outer branch with quadrant symmetry (phase offset $3\pi/2\text{ rad}$).
 
-- `bulgeRadiusFraction` ∈ [0.08, 0.15] of galaxy radius
-- `bulgeVerticalScale` ∈ [1.5, 3.0] — thicker than the disk
-- `bulgeDensityMultiplier` ∈ [3, 6] — higher star density
+- **Pitch Angle ($\psi$):** $12^\circ$ ($0.21\text{ rad}$).
+- **Morphological Features:** Radiant blue-white OB star-forming associations ($>10,000\text{ K}$), pink/magenta H II emission nebulae ($656.3\text{ nm}$ H-alpha proxy), and dark trailing dust extinction lanes.
 
-### Vertical Distribution
+---
 
-**Disk stars:** Thin Gaussian in Y.
+### Dual Exponential Disk Decomposition
 
-```
-y ~ N(0, diskThickness × 0.15)  (arm stars)
-y ~ N(0, diskThickness × 0.2)   (field stars)
-```
+The vertical and radial distribution implements a two-component galactic disk:
 
-**Bulge stars:** Wider Gaussian in Y.
+- **Thin Disk:** Scale length $h_R \approx 19.16\text{ kpc}$, scale height $h_z \approx 1.5\text{ kpc}$ ($4,892\text{ ly}$). Hosts young Population I stars, open clusters, and active molecular clouds.
+- **Thick Disk:** Scale length $h_R \approx 22.99\text{ kpc}$, scale height $h_z \approx 4.5\text{ kpc}$ ($14,677\text{ ly}$). Hosts kinematically heated, older intermediate-population stars.
 
-```
-y ~ N(0, diskThickness × bulgeVerticalScale × 0.3)
-```
+---
 
-This produces a thin disk with a thicker central bulge, consistent with the general morphology of spiral galaxies.
+### Central Supermassive Black Hole (ANANTARA A*) & High-Energy Phenomena
 
-### Galaxy Properties
+At the gravitational focus ($r = 0$) sits **ANANTARA A***, featuring dynamic mass configuration and mathematically derived physical parameters:
 
-| Property | Range | Unit |
-| ---------- | ------- | ------ |
-| Radius | 12 – 18 | kpc |
-| Disk thickness | 0.3 – 0.6 | kpc |
-| Age | 10 – 13.5 | Gyr |
-| Estimated population | 100 – 400 | billion stars |
-| Metallicity | 0.3 – 0.8 | dimensionless index |
-| Spiral arms | 2 – 4 | count |
-| Star clusters | 20 – 40 | count |
+#### 1. Configurable Mass Presets
+- **Baseline (Milky Way Sgr A* Analogue):** $4.154 \times 10^6 M_\odot \approx 8.260 \times 10^{36}\text{ kg}$
+- **Intermediate Active Nucleus:** $5.0 \times 10^7 M_\odot \approx 9.942 \times 10^{37}\text{ kg}$
+- **Giant Elliptical / M87 Class:** $1.0 \times 10^9 M_\odot \approx 1.988 \times 10^{39}\text{ kg}$
+- **Colossal Ultramassive (IC 1101 Central Class):** $4.0 \times 10^{10} M_\odot \approx 7.954 \times 10^{40}\text{ kg}$
 
-### Known Limitations — Galaxy
+#### 2. Astrophysical Derivations
+- **Schwarzschild Radius:**
+  $$r_s = \frac{2GM}{c^2} \approx 2.953\text{ km} \times \left(\frac{M}{M_\odot}\right)$$
+  - Baseline ($4.154\text{M} M_\odot$): $1.227 \times 10^{10}\text{ m} \approx 0.08203\text{ AU}$ ($12.27\text{ million km}$).
+  - Colossal ($40\text{B} M_\odot$): $1.181 \times 10^{14}\text{ m} \approx 789.88\text{ AU}$ ($118.14\text{ billion km}$).
+- **Photon Sphere:** $r_{\text{ph}} = 1.5 r_s$ (from $0.123\text{ AU}$ up to $2,369.65\text{ AU}$).
+- **Eddington Luminosity:**
+  $$L_{\text{Edd}} = \frac{4\pi G M m_p c}{\sigma_T} \approx 1.26 \times 10^{31}\text{ W} \times \left(\frac{M}{M_\odot}\right)$$
+  - Baseline: $5.23 \times 10^{37}\text{ W}$ ($1.37 \times 10^{11} L_\odot$).
+  - Colossal: $5.04 \times 10^{41}\text{ W}$ ($1.32 \times 10^{15} L_\odot$).
+- **Stellar Velocity Dispersion ($\sigma$ via $M$-$\sigma$ Relation):**
+  $$\sigma \approx 200\text{ km/s} \times \left(\frac{M}{10^8 M_\odot}\right)^{1/4.38}$$
+  - Baseline: $\approx 96.6\text{ km/s}$; Colossal: $\approx 782.9\text{ km/s}$.
+- **Gravitational Sphere of Influence:**
+  $$r_{\text{infl}} = \frac{GM}{\sigma^2}$$
+  - Baseline: $\approx 1.91\text{ pc}$ ($6.23\text{ ly}$); Colossal: $\approx 280.9\text{ pc}$ ($916.3\text{ ly}$).
 
-- Only spiral galaxies are implemented. Elliptical and irregular types are defined but not generated.
-- No galactic rotation or dynamics. Stars are static at galaxy scale.
-- No bar structure (barred spiral arms).
-- No galactic halo or globular cluster population.
-- No dark matter model or gravitational potential.
-- Star count is a representative sample (thousands), not the true population (billions).
-- Spiral arm structure is mathematically imposed, not emergent from dynamics.
-- Cluster placement favors spiral arms but does not model physical cluster formation.
-- Metallicity gradient is simplified (linear radial decay with noise).
+#### 3. Accretion Disk Simulation
+- **Particle Population:** 4,800 tracer particles across $0.8 - 4.5$ visual scene units.
+- **Keplerian Differential Rotation:** Angular velocity $\Omega(r) \propto r^{-1.25}$.
+- **Doppler Relativistic Beaming:** Orbital velocity modulates apparent particle brightness and color temperature, shifting approaching gas toward blue-white and receding gas toward red.
+- **Thermal Gradient:** Extreme inner edge emission ($T > 10^6\text{ K}$, white-gold) transitioning to outer cooler boundary ($T \approx 10^4\text{ K}$, deep orange-red).
 
-### Future Improvements — Galaxy
+#### 4. Relativistic Bipolar Jets and Synchrotron Radio Lobes
+- **Collimated Beam:** Conical outflows along the $\pm Y$ rotational axis with opening angle $\theta_{\text{jet}} \approx 2.4^\circ$.
+- **Shock Nodes:** Periodic standing shocks simulated via high-frequency longitudinal modulation ($1.8 \times 10^3\text{ ly}$ intervals).
+- **Terminal Synchrotron Lobes:** Extended spheroidal lobes at the jet termini ($\pm 52\text{ kpc}$ at baseline, scaling to $\pm 120\text{ kpc}$ at $40\text{B} M_\odot$), representing decelerating relativistic electrons interacting with circumgalactic magnetic fields.
 
-- Barred spiral morphology
-- Galactic rotation curves
-- Multiple galaxy types (elliptical, irregular, dwarf)
-- Globular cluster halo
-- Dark matter halo potential
-- Progressive LOD with distance
-- Seamless zoom from galaxy to star system
+#### 5. Scientific Visual Scale Representation
+To allow visual inspection within a galaxy-scale camera without misrepresenting physical reality:
+- The event horizon shadow sphere is rendered at an inspectable visual marker scale ($r_{\text{visual}} = 1.0\text{ units} \approx 0.76\text{ kpc}$ in normalized galaxy space).
+- The inspector explicitly displays a scale separation disclaimer: *Actual physical event horizon ($r_s$) is microscopic compared to the galactic disk ($0.082 - 790\text{ AU}$ vs $153\text{ kpc}$). The visible black sphere is a scaled simulation marker.*
+
+---
+
+### Deterministic Architecture and Backward Compatibility
+
+- **Seed Branching:** All structural components (triaxial bar, 4-arm branches, stellar halo, SMBH, accretion disk, jets) use isolated PRNG streams via `rng.fork()`.
+- **Invariance:** Star indices (`gs-42-i`), core galaxy ID (`galaxy-42`), camera navigation states, and procedural solar-system drill-down remain $100\%$ backward-compatible.
+
+---
+
+### Measured Hardware Performance & Telemetry
+
+Empirical measurements on local hardware (Chromium headless/active GPU):
+- **Rendering Performance:** 60 – 63 FPS (sustained average 61 FPS across all waypoints, including active accretion disk and radio jets).
+- **GPU Canvas Resolution:** $1920 \times 962$ physical pixels ($1536 \times 770$ CSS viewport).
+- **Memory Consumption:** JS Heap 83 – 85 MB used out of 123 MB allocated (4,192 MB ceiling).
+- **Procedural Generation Time:** $\approx 25\text{ ms}$ for 20,000 stars, 36 starburst clusters, triaxial bar, 4 arms, central nucleus, accretion disk, and jet structures.
+- **Automated Test Suite:** 12 test files, 169 tests passing ($100\%$ success rate).
 
 ---
 
@@ -188,13 +197,16 @@ This distribution is intentionally biased toward visible/interesting star types 
 
 ## Rendering Approximations (Mission 002)
 
-### Galaxy-Scale Rendering
+### Galaxy-Scale Rendering & Observatory Model
 
-- Stars rendered as `Points` geometry with additive blending and custom shaders.
-- Point size scales with luminosity and attenuates with camera distance.
-- Colors derived from spectral classification (temperature → color mapping).
-- Core glow uses a billboard plane with additive blending.
-- Dust field uses scattered large particles with very low opacity, positioned near existing stars.
+- **Dual-Profile Stellar Shader**: Dual optical component combining a cubic-falloff diffraction core with an exponential Airy-disk atmospheric halo, dynamic white-hot saturation for high luminosity stars, and seed-driven organic twinkling.
+- **Interstellar Extinction Lanes**: Procedural dark dust clouds concentrating on the inner compression ridges of logarithmic spiral arms using normal blending to silhouette stars behind them.
+- **Stellar Nurseries & H II Nebulae**: Clusters rendered with ionized hydrogen emission (H-alpha pink/cyan) envelopes surrounding radiant young OB stellar cores.
+- **Galactic Halo**: Ancient Population II low-metallicity stars distributed in a flattened spheroidal halo ($c/a \approx 0.65$).
+- **Galactic Core Glow**: Continuous radial quadratic falloff shader centered on the galactic nucleus.
+- **Kinematic Rotation Curve**: Live telemetry orbital speed calculated via flat dark-matter rotation profile:
+  $$v(r) \approx v_0 \sqrt{\frac{r}{r + r_c}}$$
+  where $v_0 = 220\text{ km/s}$ and $r_c = 1.2\text{ kpc}$, yielding asymptotic flat rotation across the disk.
 
 ### Quality Levels
 
@@ -206,11 +218,10 @@ This distribution is intentionally biased toward visible/interesting star types 
 
 ### Known Limitations — Rendering
 
-- No volumetric rendering. Dust is approximated by scattered particles.
-- No post-processing bloom (relies on additive blending for glow effect).
-- Point sprites have no 3D structure at close range.
-- Raycasting on Points geometry may miss stars at extreme distances.
-- No seamless zoom transition between galaxy and system views.
+- Dust uses particle-based normal-blended extinction rather than full volumetric radiative transfer.
+- No post-processing bloom pass (optical profiles are synthesized analytically in the point shaders).
+- Point sprites attenuate optically but have no resolved stellar surface at sub-parsec distances.
+- Seamless multi-scale continuous camera zooming across orders of magnitude is planned for future milestones.
 
 ---
 

@@ -3,6 +3,7 @@
  *
  * Top-level application shell that integrates:
  * - Galaxy generation and navigation
+ * - Cinematic Galaxy Observatory (presets, layers, telemetry)
  * - Solar system drill-down
  * - Simulation engine (for planetary physics)
  * - 3D rendering scenes (galaxy + solar system)
@@ -13,8 +14,14 @@
  */
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Scene } from '../rendering/Scene';
-import { GalaxyScene } from '../rendering/GalaxyScene';
+import {
+  Scene,
+  GalaxyScene,
+  DEFAULT_LAYER_VISIBILITY,
+  type CameraPreset,
+  type GalaxyTelemetry,
+  type GalaxyLayerVisibility,
+} from '../rendering';
 import { TimeControls } from './TimeControls';
 import { UnifiedInfoPanel } from './GalaxyInfoPanel';
 import { SimulationEngine } from '../engine/SimulationEngine';
@@ -47,8 +54,14 @@ export function App() {
   // ── UI State ────────────────────────────────────
   const [viewLevel, setViewLevel] = useState<string>(ViewLevel.GALAXY);
   const [selectedStarIndex, setSelectedStarIndex] = useState<number | null>(null);
+  const [selectedNucleus, setSelectedNucleus] = useState<boolean>(false);
   const [selectedBodyId, setSelectedBodyId] = useState<string | null>(null);
   const [, setTick] = useState(0);
+
+  // ── Observatory State ───────────────────────────
+  const [layers, setLayers] = useState<GalaxyLayerVisibility>(DEFAULT_LAYER_VISIBILITY);
+  const [activePreset, setActivePreset] = useState<CameraPreset | null>(null);
+  const [telemetry, setTelemetry] = useState<GalaxyTelemetry | undefined>(undefined);
 
   const inSystemView = viewLevel === ViewLevel.SYSTEM;
 
@@ -80,11 +93,43 @@ export function App() {
 
   const handleStarClick = useCallback((index: number) => {
     setSelectedStarIndex(index);
+    setSelectedNucleus(false);
+  }, []);
+
+  const handleNucleusClick = useCallback(() => {
+    setSelectedNucleus(true);
+    setSelectedStarIndex(null);
   }, []);
 
   const handleGalaxyBackgroundClick = useCallback(() => {
     setSelectedStarIndex(null);
+    setSelectedNucleus(false);
   }, []);
+
+  const handleSelectPreset = useCallback((preset: CameraPreset) => {
+    setActivePreset(preset);
+  }, []);
+
+  const handlePresetComplete = useCallback(() => {
+    // Keep activePreset set so specific viewpoints remain locked without autoRotate drift
+  }, []);
+
+  const handleToggleLayer = useCallback((layer: keyof GalaxyLayerVisibility) => {
+    setLayers(prev => ({
+      ...prev,
+      [layer]: !prev[layer],
+    }));
+  }, []);
+
+  const handleTelemetryUpdate = useCallback((t: GalaxyTelemetry) => {
+    setTelemetry(t);
+  }, []);
+
+  const handleUpdateNucleusMass = useCallback((massSolar: number) => {
+    universe.setNucleusMass(massSolar);
+    setSelectedNucleus(true);
+    setTick(t => t + 1);
+  }, [universe]);
 
   // ── System View Handlers ────────────────────────
 
@@ -176,8 +221,14 @@ export function App() {
         <GalaxyScene
           galaxy={galaxy}
           selectedStarIndex={selectedStarIndex}
+          selectedNucleus={selectedNucleus}
           onStarClick={handleStarClick}
+          onNucleusClick={handleNucleusClick}
           onBackgroundClick={handleGalaxyBackgroundClick}
+          layers={layers}
+          activePreset={activePreset}
+          onPresetComplete={handlePresetComplete}
+          onTelemetryUpdate={handleTelemetryUpdate}
         />
       )}
 
@@ -204,9 +255,17 @@ export function App() {
         selectedStar={selectedStar}
         selectedCluster={selectedCluster}
         selectedBody={selectedBody}
+        selectedNucleus={selectedNucleus}
+        onSelectNucleus={setSelectedNucleus}
+        onUpdateNucleusMass={handleUpdateNucleusMass}
         inSystemView={inSystemView}
         onEnterSystem={handleEnterSystem}
         onExitSystem={handleExitSystem}
+        activePreset={activePreset}
+        onSelectPreset={handleSelectPreset}
+        layers={layers}
+        onToggleLayer={handleToggleLayer}
+        telemetry={telemetry}
       />
     </div>
   );

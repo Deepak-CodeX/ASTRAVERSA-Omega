@@ -13,9 +13,9 @@
 import type { CelestialBody } from './CelestialBody';
 import type { SolarSystem } from './SolarSystemGenerator';
 import { generateSolarSystem } from './SolarSystemGenerator';
-import type { Galaxy, GalaxyStar, NavigationState } from './Galaxy';
+import type { Galaxy, GalaxyStar, NavigationState, SupermassiveBlackHole } from './Galaxy';
 import { ViewLevel } from './Galaxy';
-import { generateGalaxy } from './GalaxyGenerator';
+import { generateGalaxy, recalculateSupermassiveBlackHole } from './GalaxyGenerator';
 import type { GalaxyGenerationConfig } from './GalaxyGenerator';
 
 /**
@@ -133,6 +133,38 @@ export class Universe {
     return null;
   }
 
+  /** Get the central supermassive black hole. */
+  get nucleus(): SupermassiveBlackHole | null {
+    return this._galaxy?.nucleus ?? null;
+  }
+
+  /** Enter galactic nucleus inspection view. */
+  enterNucleus(): SupermassiveBlackHole | null {
+    if (!this._galaxy || !this._galaxy.nucleus) return null;
+    this._navigation = {
+      level: ViewLevel.NUCLEUS,
+      galaxyId: this._galaxy.id,
+    };
+    return this._galaxy.nucleus;
+  }
+
+  /** Return to galaxy view from nucleus inspection. */
+  exitNucleus(): void {
+    if (this._galaxy) {
+      this._navigation = {
+        level: ViewLevel.GALAXY,
+        galaxyId: this._galaxy.id,
+      };
+    }
+  }
+
+  /** Reconfigure the central supermassive black hole mass dynamically. */
+  setNucleusMass(massSolar: number): SupermassiveBlackHole | null {
+    if (!this._galaxy || !this._galaxy.nucleus) return null;
+    this._galaxy.nucleus = recalculateSupermassiveBlackHole(massSolar, this._galaxy.nucleus);
+    return this._galaxy.nucleus;
+  }
+
   /** Get all bodies in the current solar system. */
   get bodies(): CelestialBody[] {
     return this._solarSystem?.bodies ?? [];
@@ -148,6 +180,11 @@ export class Universe {
   /** Get the current navigation state. */
   get navigation(): NavigationState {
     return this._navigation;
+  }
+
+  /** Get current view level */
+  get viewLevel(): ViewLevel {
+    return this._navigation.level;
   }
 
   /** Set navigation state. */
