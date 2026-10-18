@@ -21,6 +21,8 @@ import {
   type CameraPreset,
   type GalaxyTelemetry,
   type GalaxyLayerVisibility,
+  type GalaxyObservatorySettings,
+  createDefaultObservatorySettings,
 } from '../rendering';
 import { TimeControls } from './TimeControls';
 import { UnifiedInfoPanel } from './GalaxyInfoPanel';
@@ -62,6 +64,10 @@ export function App() {
   const [layers, setLayers] = useState<GalaxyLayerVisibility>(DEFAULT_LAYER_VISIBILITY);
   const [activePreset, setActivePreset] = useState<CameraPreset | null>(null);
   const [telemetry, setTelemetry] = useState<GalaxyTelemetry | undefined>(undefined);
+  const [observatorySettings, setObservatorySettings] = useState<GalaxyObservatorySettings>(() =>
+    createDefaultObservatorySettings()
+  );
+  const [currentPhysicalDiameterLy, setCurrentPhysicalDiameterLy] = useState<number>(500000);
 
   const inSystemView = viewLevel === ViewLevel.SYSTEM;
 
@@ -130,6 +136,31 @@ export function App() {
     setSelectedNucleus(true);
     setTick(t => t + 1);
   }, [universe]);
+
+  const handleUpdateObservatorySettings = useCallback((updates: Partial<GalaxyObservatorySettings>) => {
+    setObservatorySettings(prev => ({ ...prev, ...updates }));
+  }, []);
+
+  const handlePhysicalDiameterChange = useCallback((diameterLy: number) => {
+    setCurrentPhysicalDiameterLy(diameterLy);
+    universe.generateGalaxy({ targetDiameterLy: diameterLy, quality: 'MEDIUM' as const });
+    setSelectedStarIndex(null);
+    setSelectedNucleus(false);
+    setTick(t => t + 1);
+  }, [universe]);
+
+  const handleResetObservatorySettings = useCallback(() => {
+    setObservatorySettings(createDefaultObservatorySettings());
+    setLayers(DEFAULT_LAYER_VISIBILITY);
+    setActivePreset('overview');
+    if (currentPhysicalDiameterLy !== 500000) {
+      setCurrentPhysicalDiameterLy(500000);
+      universe.generateGalaxy({ targetDiameterLy: 500000, quality: 'MEDIUM' as const });
+    }
+    setSelectedStarIndex(null);
+    setSelectedNucleus(false);
+    setTick(t => t + 1);
+  }, [universe, currentPhysicalDiameterLy]);
 
   // ── System View Handlers ────────────────────────
 
@@ -226,6 +257,7 @@ export function App() {
           onNucleusClick={handleNucleusClick}
           onBackgroundClick={handleGalaxyBackgroundClick}
           layers={layers}
+          settings={observatorySettings}
           activePreset={activePreset}
           onPresetComplete={handlePresetComplete}
           onTelemetryUpdate={handleTelemetryUpdate}
@@ -266,6 +298,11 @@ export function App() {
         layers={layers}
         onToggleLayer={handleToggleLayer}
         telemetry={telemetry}
+        observatorySettings={observatorySettings}
+        onUpdateObservatorySettings={handleUpdateObservatorySettings}
+        onResetObservatorySettings={handleResetObservatorySettings}
+        onPhysicalDiameterChange={handlePhysicalDiameterChange}
+        currentPhysicalDiameterLy={currentPhysicalDiameterLy}
       />
     </div>
   );

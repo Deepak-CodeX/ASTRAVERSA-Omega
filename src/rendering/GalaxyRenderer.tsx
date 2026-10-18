@@ -18,6 +18,10 @@ import * as THREE from 'three';
 import type { Galaxy, GalaxyStar } from '../universe/Galaxy';
 import { RENDER_SCALE_KPC } from '../astronomy/constants';
 import { SeededRandom } from '../universe/SeededRandom';
+import {
+  type GalaxyObservatorySettings,
+  DEFAULT_OBSERVATORY_SETTINGS,
+} from './GalaxyObservatoryTypes';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Layer Visibility Interface
@@ -150,6 +154,7 @@ const DUST_VERTEX_SHADER = `
 `;
 
 const DUST_FRAGMENT_SHADER = `
+  uniform float uOpacityMultiplier;
   varying vec3 vColor;
   varying float vOpacity;
 
@@ -161,7 +166,7 @@ const DUST_FRAGMENT_SHADER = `
 
     // Smooth volumetric filament falloff with dense core
     float falloff = 1.0 - smoothstep(0.0, 0.5, dist);
-    float alpha = pow(falloff, 1.6) * vOpacity;
+    float alpha = pow(falloff, 1.6) * vOpacity * uOpacityMultiplier;
 
     gl_FragColor = vec4(vColor, alpha);
   }
@@ -320,6 +325,7 @@ const HALO_VERTEX_SHADER = `
 `;
 
 const HALO_FRAGMENT_SHADER = `
+  uniform float uOpacityMultiplier;
   varying vec3 vColor;
   varying float vOpacity;
 
@@ -331,7 +337,7 @@ const HALO_FRAGMENT_SHADER = `
 
     // Smooth airy falloff for faint Population II envelope
     float falloff = exp(-dist * 5.2);
-    float alpha = falloff * vOpacity;
+    float alpha = falloff * vOpacity * uOpacityMultiplier;
 
     if (alpha < 0.01) discard;
 
@@ -348,9 +354,16 @@ interface GalaxyStarFieldProps {
   time: number;
   layers: GalaxyLayerVisibility;
   onStarClick: (index: number) => void;
+  starSizeMultiplier?: number;
 }
 
-function GalaxyStarField({ galaxy, time, layers, onStarClick }: GalaxyStarFieldProps) {
+function GalaxyStarField({
+  galaxy,
+  time,
+  layers,
+  onStarClick,
+  starSizeMultiplier = 1.0,
+}: GalaxyStarFieldProps) {
   const pointsRef = useRef<THREE.Points>(null);
   const raycasterRef = useRef(new THREE.Raycaster());
   const { camera } = useThree();
@@ -485,10 +498,13 @@ function GalaxyStarField({ galaxy, time, layers, onStarClick }: GalaxyStarFieldP
     return { geometry: geom, material: mat };
   }, [galaxy, layers.disk, layers.bar, layers.bulge]);
 
-  // Update time uniform for twinkling
+  // Update time and size uniforms
   useFrame(() => {
     if (material && material.uniforms) {
       material.uniforms.uTime.value = time;
+      if (material.uniforms.uSizeMul) {
+        material.uniforms.uSizeMul.value = starSizeMultiplier;
+      }
     }
   });
 
@@ -540,9 +556,10 @@ function GalaxyStarField({ galaxy, time, layers, onStarClick }: GalaxyStarFieldP
 
 interface DustFieldProps {
   galaxy: Galaxy;
+  opacityMultiplier?: number;
 }
 
-function DustField({ galaxy }: DustFieldProps) {
+function DustField({ galaxy, opacityMultiplier = 1.0 }: DustFieldProps) {
   const { geometry, material } = useMemo(() => {
     const rng = new SeededRandom(galaxy.seed + 777);
     const armDefs = galaxy.spiralArmDefinitions;
@@ -649,6 +666,7 @@ function DustField({ galaxy }: DustFieldProps) {
       fragmentShader: DUST_FRAGMENT_SHADER,
       uniforms: {
         uPixelRatio: { value: typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 1 },
+        uOpacityMultiplier: { value: opacityMultiplier },
       },
       transparent: true,
       depthWrite: false,
@@ -657,6 +675,12 @@ function DustField({ galaxy }: DustFieldProps) {
 
     return { geometry: geom, material: mat };
   }, [galaxy]);
+
+  useFrame(() => {
+    if (material && material.uniforms && material.uniforms.uOpacityMultiplier) {
+      material.uniforms.uOpacityMultiplier.value = opacityMultiplier;
+    }
+  });
 
   return <points geometry={geometry} material={material} />;
 }
@@ -751,9 +775,10 @@ function ClusterField({ galaxy }: ClusterFieldProps) {
 
 interface GalacticHaloProps {
   galaxy: Galaxy;
+  opacityMultiplier?: number;
 }
 
-function GalacticHalo({ galaxy }: GalacticHaloProps) {
+function GalacticHalo({ galaxy, opacityMultiplier = 0.35 }: GalacticHaloProps) {
   const { geometry, material } = useMemo(() => {
     const rng = new SeededRandom(galaxy.seed + 9999);
     const haloCount = 3600;
@@ -798,6 +823,7 @@ function GalacticHalo({ galaxy }: GalacticHaloProps) {
       fragmentShader: HALO_FRAGMENT_SHADER,
       uniforms: {
         uPixelRatio: { value: typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 1 },
+        uOpacityMultiplier: { value: opacityMultiplier },
       },
       transparent: true,
       depthWrite: false,
@@ -806,6 +832,12 @@ function GalacticHalo({ galaxy }: GalacticHaloProps) {
 
     return { geometry: geom, material: mat };
   }, [galaxy]);
+
+  useFrame(() => {
+    if (material && material.uniforms && material.uniforms.uOpacityMultiplier) {
+      material.uniforms.uOpacityMultiplier.value = opacityMultiplier;
+    }
+  });
 
   return <points geometry={geometry} material={material} />;
 }
@@ -1628,6 +1660,7 @@ export interface GalaxyRendererProps {
   onStarClick: (index: number) => void;
   onNucleusClick?: () => void;
   layers?: GalaxyLayerVisibility;
+  settings?: GalaxyObservatorySettings;
   time?: number;
 }
 
@@ -1638,14 +1671,31 @@ export function GalaxyRenderer({
   onStarClick,
   onNucleusClick,
   layers = DEFAULT_LAYER_VISIBILITY,
+  settings = DEFAULT_OBSERVATORY_SETTINGS,
   time = 0,
 }: GalaxyRendererProps) {
   const selectedStar = selectedStarIndex !== null
     ? galaxy.stars[selectedStarIndex] ?? null
     : null;
 
+  const rootRef = useRef<THREE.Group>(null);
+  const visualRotationAngle = useRef(0);
+
+  // Rigid-body visual rotation of the galactic disk structure
+  useFrame((_, delta) => {
+    if (rootRef.current) {
+      if (!settings.isPaused) {
+        visualRotationAngle.current += delta * settings.visualRotationSpeed * 0.05;
+      }
+      rootRef.current.rotation.y = visualRotationAngle.current;
+    }
+  });
+
+  const renderScale = settings.renderScale;
+  const effectiveTime = time * settings.orbitalMotionSpeed;
+
   return (
-    <group>
+    <group ref={rootRef} scale={[renderScale, renderScale, renderScale]}>
       {/* 1. Central Bulge Core Glow */}
       {layers.bulge && <GalacticCoreGlow galaxy={galaxy} />}
 
@@ -1654,7 +1704,7 @@ export function GalaxyRenderer({
 
       {/* 3. Optional Scientifically Motivated Relativistic Radio Jets & Terminating Lobes */}
       {layers.jets && (
-        <RelativisticJetsRenderer galaxy={galaxy} time={time} />
+        <RelativisticJetsRenderer galaxy={galaxy} time={effectiveTime} />
       )}
 
       {/* 4. Galactic Nucleus (ANANTARA A* SMBH) */}
@@ -1664,24 +1714,35 @@ export function GalaxyRenderer({
           isSelected={selectedNucleus}
           onClick={onNucleusClick}
           showAccretion={layers.accretion}
-          time={time}
+          time={effectiveTime}
         />
       )}
 
       {/* 5. Galactic Halo (Smooth Population II envelope) */}
-      {layers.halo && <GalacticHalo galaxy={galaxy} />}
+      {layers.halo && (
+        <GalacticHalo
+          galaxy={galaxy}
+          opacityMultiplier={settings.haloOpacity}
+        />
+      )}
 
       {/* 6. Star Clusters (Nurseries & H II Emission) */}
       {layers.clusters && <ClusterField galaxy={galaxy} />}
 
       {/* 7. Dark Dust Extinction Lanes (Silhouettes against bright diffuse disk & bar) */}
-      {layers.dust && <DustField galaxy={galaxy} />}
+      {layers.dust && (
+        <DustField
+          galaxy={galaxy}
+          opacityMultiplier={settings.dustOpacity}
+        />
+      )}
 
       {/* 8. Stellar Field (Individual stars: Disk, Bar, Bulge Stars) */}
       <GalaxyStarField
         galaxy={galaxy}
-        time={time}
+        time={effectiveTime}
         layers={layers}
+        starSizeMultiplier={settings.starSizeMultiplier}
         onStarClick={onStarClick}
       />
 
@@ -1693,3 +1754,4 @@ export function GalaxyRenderer({
     </group>
   );
 }
+

@@ -19,4 +19,9 @@ export {
   type CameraPreset,
   type GalaxyTelemetry,
 } from './GalaxyScene';
+export {
+  type GalaxyObservatorySettings,
+  DEFAULT_OBSERVATORY_SETTINGS,
+  createDefaultObservatorySettings,
+} from './GalaxyObservatoryTypes';
 

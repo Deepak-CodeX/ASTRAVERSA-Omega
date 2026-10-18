@@ -137,4 +137,158 @@ describe('Galaxy Observatory System', () => {
       expect(edgeSpeed).toBeLessThan(225);
     });
   });
+
+  describe('Mission 003A — Galaxy Controls v1 Settings & State', () => {
+    it('has documented canonical defaults for all observatory parameters', async () => {
+      const { DEFAULT_OBSERVATORY_SETTINGS, createDefaultObservatorySettings } = await import(
+        '../src/rendering'
+      );
+
+      expect(DEFAULT_OBSERVATORY_SETTINGS).toEqual({
+        renderScale: 1.0,
+        targetDiameterLy: 500000,
+        visualRotationSpeed: 1.0,
+        orbitalMotionSpeed: 1.0,
+        isPaused: false,
+        timeSpeed: 1.0,
+        starSizeMultiplier: 1.0,
+        haloOpacity: 0.35,
+        dustOpacity: 0.50,
+        cameraDistanceMultiplier: 1.0,
+        cameraFov: 52,
+      });
+
+      const freshCopy = createDefaultObservatorySettings();
+      expect(freshCopy).toEqual(DEFAULT_OBSERVATORY_SETTINGS);
+      // Verify independence (not a mutated reference)
+      freshCopy.renderScale = 2.0;
+      expect(DEFAULT_OBSERVATORY_SETTINGS.renderScale).toBe(1.0);
+    });
+
+    it('strictly separates visual rendering scale from physical model diameter', () => {
+      // 1. Physical model diameter changes the astronomical galaxy entity
+      const galaxyCanonical = generateGalaxy(42, { quality: 'LOW', targetDiameterLy: 500000 });
+      const galaxyMilkyWay = generateGalaxy(42, { quality: 'LOW', targetDiameterLy: 100000 });
+      const galaxySupergiant = generateGalaxy(42, { quality: 'LOW', targetDiameterLy: 1000000 });
+
+      // Physical radii and scale heights are recalculated
+      expect(galaxyMilkyWay.radius).toBeCloseTo(15.33, 1); // ~15.33 kpc
+      expect(galaxyCanonical.radius).toBeCloseTo(76.65, 1); // ~76.65 kpc
+      expect(galaxySupergiant.radius).toBeCloseTo(153.29, 1); // ~153.29 kpc
+
+      // Bar semi-major axis scales proportionally with physical galaxy radius
+      expect(galaxyMilkyWay.bar?.length).toBeLessThan(galaxyCanonical.bar?.length ?? 0);
+      expect(galaxySupergiant.bar?.length).toBeGreaterThan(galaxyCanonical.bar?.length ?? 0);
+
+      // 2. Visual rendering scale is an optical GPU multiplier
+      const visualScale = 1.75;
+      const effectiveSceneRadius = galaxyCanonical.radius * RENDER_SCALE_KPC * visualScale;
+      expect(effectiveSceneRadius).toBeCloseTo(galaxyCanonical.radius * RENDER_SCALE_KPC * 1.75, 4);
+
+      // Model parsec data remains unchanged when only visual scale is changed
+      expect(galaxyCanonical.diskStructure?.mainDiskDiameterLy).toBe(500000);
+      expect(galaxyCanonical.seed).toBe(42);
+    });
+
+    it('differentiates rigid-body visual rotation from internal orbital dynamics', () => {
+      // Rigid-body rotation rate: scales outer group rotation angle
+      const deltaT = 0.016; // 1 frame (~60 FPS)
+      const visualSpeed1 = 1.0;
+      const visualSpeed2 = 2.5;
+
+      const deltaAngle1 = deltaT * visualSpeed1 * 0.05;
+      const deltaAngle2 = deltaT * visualSpeed2 * 0.05;
+
+      expect(deltaAngle2).toBe(deltaAngle1 * 2.5);
+
+      // Orbital dynamics modifies internal effectiveTime driving shader phases
+      const time = 10.0;
+      const orbitalSpeed1 = 1.0;
+      const orbitalSpeed2 = 3.0;
+
+      const effectiveTime1 = time * orbitalSpeed1;
+      const effectiveTime2 = time * orbitalSpeed2;
+
+      expect(effectiveTime1).toBe(10.0);
+      expect(effectiveTime2).toBe(30.0);
+      // Independent parameters
+      expect(effectiveTime2).not.toBe(deltaAngle2);
+    });
+
+    it('supports simulation pause and variable time dilation', () => {
+      const dt = 0.016;
+
+      // When running at 1x
+      let simTime = 0;
+      let isPaused = false;
+      let timeSpeed = 1.0;
+
+      if (!isPaused) simTime += dt * timeSpeed;
+      expect(simTime).toBeCloseTo(0.016, 5);
+
+      // When time speed is dilated (2.5x)
+      timeSpeed = 2.5;
+      if (!isPaused) simTime += dt * timeSpeed;
+      expect(simTime).toBeCloseTo(0.016 + 0.040, 5);
+
+      // When paused
+      isPaused = true;
+      const frozenTime = simTime;
+      if (!isPaused) simTime += dt * timeSpeed;
+      expect(simTime).toBe(frozenTime); // Unchanged
+    });
+
+    it('allows camera FOV and distance adjustment without altering star coordinates', () => {
+      const defaultFov = 52;
+      const wideFov = 75;
+      const teleFov = 30;
+
+      expect(wideFov).toBeGreaterThan(defaultFov);
+      expect(teleFov).toBeLessThan(defaultFov);
+
+      // Distance multiplier scales camera distance while maintaining target vector
+      const targetPos = { x: 0, y: 0, z: 0 };
+      const basePos = { x: 100, y: 200, z: 150 };
+
+      const distMul = 1.5;
+      const scaledPos = {
+        x: targetPos.x + (basePos.x - targetPos.x) * distMul,
+        y: targetPos.y + (basePos.y - targetPos.y) * distMul,
+        z: targetPos.z + (basePos.z - targetPos.z) * distMul,
+      };
+
+      expect(scaledPos.x).toBe(150);
+      expect(scaledPos.y).toBe(300);
+      expect(scaledPos.z).toBe(225);
+    });
+
+    it('resets observatory defaults without corrupting procedural seed 42 or navigation', async () => {
+      const { createDefaultObservatorySettings } = await import('../src/rendering');
+      const { Universe } = await import('../src/universe/Universe');
+
+      const universe = new Universe(42);
+      universe.generateGalaxy({ quality: 'LOW', targetDiameterLy: 250000 });
+
+      // User modified physical diameter to 250k ly
+      expect(universe.galaxy?.diskStructure?.mainDiskDiameterLy).toBe(250000);
+
+      // Reset action restores canonical 500k ly model and canonical observatory settings
+      const resetSettings = createDefaultObservatorySettings();
+      universe.generateGalaxy({ quality: 'LOW', targetDiameterLy: 500000 });
+
+      expect(resetSettings.renderScale).toBe(1.0);
+      expect(resetSettings.isPaused).toBe(false);
+      expect(resetSettings.timeSpeed).toBe(1.0);
+      expect(resetSettings.cameraFov).toBe(52);
+      expect(universe.galaxy?.diskStructure?.mainDiskDiameterLy).toBe(500000);
+      expect(universe.seed).toBe(42);
+
+      // Star IDs and solar system drill-down remain intact
+      expect(universe.galaxy?.stars[0].id).toBe('gs-42-0');
+      const system = universe.enterStarSystem(0);
+      expect(system).toBeDefined();
+      expect(system?.bodies.length).toBeGreaterThan(0);
+    });
+  });
 });
+

@@ -12,6 +12,10 @@ import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import type { Galaxy } from '../universe/Galaxy';
 import { GalaxyRenderer, DEFAULT_LAYER_VISIBILITY, type GalaxyLayerVisibility } from './GalaxyRenderer';
+import {
+  type GalaxyObservatorySettings,
+  DEFAULT_OBSERVATORY_SETTINGS,
+} from './GalaxyObservatoryTypes';
 import { RENDER_SCALE_KPC } from '../astronomy/constants';
 import { SeededRandom } from '../universe/SeededRandom';
 
@@ -167,6 +171,7 @@ interface GalaxySceneContentProps {
   onNucleusClick?: () => void;
   onBackgroundClick: () => void;
   layers?: GalaxyLayerVisibility;
+  settings?: GalaxyObservatorySettings;
   activePreset?: CameraPreset | null;
   onPresetComplete?: () => void;
   onTelemetryUpdate?: (telemetry: GalaxyTelemetry) => void;
@@ -180,6 +185,7 @@ function GalaxySceneContent({
   onNucleusClick,
   onBackgroundClick: _onBackgroundClick,
   layers = DEFAULT_LAYER_VISIBILITY,
+  settings = DEFAULT_OBSERVATORY_SETTINGS,
   activePreset = null,
   onPresetComplete,
   onTelemetryUpdate,
@@ -200,65 +206,77 @@ function GalaxySceneContent({
   const fpsTime = useRef<number>(0);
   const [simTime, setSimTime] = useState<number>(0);
 
+  // Dynamically update camera FOV from observatory settings
+  useEffect(() => {
+    if (settings.cameraFov && (camera as THREE.PerspectiveCamera).fov !== settings.cameraFov) {
+      (camera as THREE.PerspectiveCamera).fov = settings.cameraFov;
+      camera.updateProjectionMatrix();
+    }
+  }, [camera, settings.cameraFov]);
+
+  // Adjust camera distance along current view axis when distance multiplier changes
+  const prevDistMul = useRef(settings.cameraDistanceMultiplier);
+  useEffect(() => {
+    const newDistMul = settings.cameraDistanceMultiplier;
+    if (controlsRef.current && prevDistMul.current !== newDistMul && prevDistMul.current > 0) {
+      const ratio = newDistMul / prevDistMul.current;
+      const target = controlsRef.current.target;
+      const offset = camera.position.clone().sub(target);
+      offset.multiplyScalar(ratio);
+      camera.position.copy(target).add(offset);
+      controlsRef.current.update();
+    }
+    prevDistMul.current = newDistMul;
+  }, [camera, settings.cameraDistanceMultiplier]);
+
   // Helper to compute preset positions
   const getPresetVectors = (preset: CameraPreset): { pos: THREE.Vector3; target: THREE.Vector3 } => {
     const R = galaxy.radius * RENDER_SCALE_KPC;
+    const distMul = settings.cameraDistanceMultiplier;
+    let basePos: THREE.Vector3;
+    let baseTarget = new THREE.Vector3(0, 0, 0);
+
     switch (preset) {
       case 'overview':
-        return {
-          pos: new THREE.Vector3(R * 0.45, R * 0.95, R * 0.75),
-          target: new THREE.Vector3(0, 0, 0),
-        };
+        basePos = new THREE.Vector3(R * 0.45, R * 0.95, R * 0.75);
+        break;
       case 'topDown':
-        return {
-          pos: new THREE.Vector3(0, R * 1.55, R * 0.04),
-          target: new THREE.Vector3(0, 0, 0),
-        };
+        basePos = new THREE.Vector3(0, R * 1.55, R * 0.04);
+        break;
       case 'nucleus':
-        return {
-          pos: new THREE.Vector3(R * 0.022, R * 0.012, R * 0.028),
-          target: new THREE.Vector3(0, 0, 0),
-        };
+        basePos = new THREE.Vector3(R * 0.022, R * 0.012, R * 0.028);
+        break;
       case 'bar': {
         const phi = galaxy.bar?.angle ?? 0.4886;
-        return {
-          pos: new THREE.Vector3(R * 0.28 * Math.cos(phi - 0.5), R * 0.16, R * 0.28 * Math.sin(phi - 0.5)),
-          target: new THREE.Vector3(0, 0, 0),
-        };
+        basePos = new THREE.Vector3(R * 0.28 * Math.cos(phi - 0.5), R * 0.16, R * 0.28 * Math.sin(phi - 0.5));
+        break;
       }
       case 'core':
-        return {
-          pos: new THREE.Vector3(R * 0.16, R * 0.10, R * 0.20),
-          target: new THREE.Vector3(0, 0, 0),
-        };
+        basePos = new THREE.Vector3(R * 0.16, R * 0.10, R * 0.20);
+        break;
       case 'arm':
-        return {
-          pos: new THREE.Vector3(R * 0.65, R * 0.15, R * 0.35),
-          target: new THREE.Vector3(R * 0.40, 0, R * 0.15),
-        };
+        basePos = new THREE.Vector3(R * 0.65, R * 0.15, R * 0.35);
+        baseTarget = new THREE.Vector3(R * 0.40, 0, R * 0.15);
+        break;
       case 'edge':
-        return {
-          pos: new THREE.Vector3(R * 1.35, R * 0.02, 0),
-          target: new THREE.Vector3(0, 0, 0),
-        };
+        basePos = new THREE.Vector3(R * 1.35, R * 0.02, 0);
+        break;
       case 'jets':
-        return {
-          pos: new THREE.Vector3(R * 0.90, R * 0.45, R * 0.90),
-          target: new THREE.Vector3(0, 0, 0),
-        };
+        basePos = new THREE.Vector3(R * 0.90, R * 0.45, R * 0.90);
+        break;
       case 'cluster':
         if (galaxy.clusters.length > 0) {
           const c = galaxy.clusters[0];
-          return {
-            pos: new THREE.Vector3(c.x * RENDER_SCALE_KPC + 18, c.y * RENDER_SCALE_KPC + 10, c.z * RENDER_SCALE_KPC + 18),
-            target: new THREE.Vector3(c.x * RENDER_SCALE_KPC, c.y * RENDER_SCALE_KPC, c.z * RENDER_SCALE_KPC),
-          };
+          basePos = new THREE.Vector3(c.x * RENDER_SCALE_KPC + 18, c.y * RENDER_SCALE_KPC + 10, c.z * RENDER_SCALE_KPC + 18);
+          baseTarget = new THREE.Vector3(c.x * RENDER_SCALE_KPC, c.y * RENDER_SCALE_KPC, c.z * RENDER_SCALE_KPC);
+        } else {
+          basePos = new THREE.Vector3(R * 0.45, R * 0.95, R * 0.75);
         }
-        return {
-          pos: new THREE.Vector3(R * 0.45, R * 0.95, R * 0.75),
-          target: new THREE.Vector3(0, 0, 0),
-        };
+        break;
     }
+
+    basePos.multiplyScalar(distMul);
+    return { pos: basePos, target: baseTarget };
   };
 
   // Initial camera placement on load
@@ -289,7 +307,9 @@ function GalaxySceneContent({
   // Main animation frame loop
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
-    setSimTime(t => t + dt);
+    if (!settings.isPaused) {
+      setSimTime(t => t + dt * settings.timeSpeed);
+    }
 
     // Camera preset cubic ease-out interpolation
     if (isTransitioningRef.current && controlsRef.current) {
@@ -322,8 +342,8 @@ function GalaxySceneContent({
       !isTransitioningRef.current &&
       (activePreset === null || activePreset === 'overview')
     ) {
-      controlsRef.current.autoRotate = true;
-      controlsRef.current.autoRotateSpeed = 0.08;
+      controlsRef.current.autoRotate = !settings.isPaused;
+      controlsRef.current.autoRotateSpeed = 0.08 * settings.visualRotationSpeed;
     } else if (controlsRef.current) {
       controlsRef.current.autoRotate = false;
     }
@@ -377,6 +397,7 @@ function GalaxySceneContent({
         onStarClick={onStarClick}
         onNucleusClick={onNucleusClick}
         layers={layers}
+        settings={settings}
         time={simTime}
       />
     </>
@@ -395,6 +416,7 @@ export interface GalaxySceneProps {
   onNucleusClick?: () => void;
   onBackgroundClick: () => void;
   layers?: GalaxyLayerVisibility;
+  settings?: GalaxyObservatorySettings;
   activePreset?: CameraPreset | null;
   onPresetComplete?: () => void;
   onTelemetryUpdate?: (telemetry: GalaxyTelemetry) => void;
@@ -408,6 +430,7 @@ export function GalaxyScene({
   onNucleusClick,
   onBackgroundClick,
   layers,
+  settings,
   activePreset,
   onPresetComplete,
   onTelemetryUpdate,
@@ -416,7 +439,7 @@ export function GalaxyScene({
     <Canvas
       camera={{
         position: [200, 450, 350],
-        fov: 52,
+        fov: settings?.cameraFov ?? 52,
         near: 0.1,
         far: 60000,
       }}
@@ -436,6 +459,7 @@ export function GalaxyScene({
         onNucleusClick={onNucleusClick}
         onBackgroundClick={onBackgroundClick}
         layers={layers}
+        settings={settings}
         activePreset={activePreset}
         onPresetComplete={onPresetComplete}
         onTelemetryUpdate={onTelemetryUpdate}

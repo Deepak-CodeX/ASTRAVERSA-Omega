@@ -13,9 +13,14 @@
  */
 
 import type { Galaxy, GalaxyStar, StarCluster } from '../universe/Galaxy';
-import type { CelestialBody } from '../universe/CelestialBody';
-import { CelestialBodyType } from '../universe/CelestialBody';
-import type { CameraPreset, GalaxyTelemetry, GalaxyLayerVisibility } from '../rendering';
+import { type CelestialBody, CelestialBodyType } from '../universe/CelestialBody';
+import type {
+  CameraPreset,
+  GalaxyTelemetry,
+  GalaxyLayerVisibility,
+  GalaxyObservatorySettings,
+} from '../rendering';
+import { DEFAULT_OBSERVATORY_SETTINGS } from '../rendering';
 import {
   SOLAR_MASS,
   SOLAR_RADIUS,
@@ -56,10 +61,62 @@ function formatNumber(value: number, decimals: number = 2): string {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Control Slider Component
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+interface ControlSliderProps {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  unit?: string;
+  subtext?: string;
+  onChange: (val: number) => void;
+}
+
+function ControlSlider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  unit = '',
+  subtext,
+  onChange,
+}: ControlSliderProps) {
+  return (
+    <div style={styles.controlGroup}>
+      <div style={styles.sliderHeader}>
+        <span style={styles.sliderLabel}>{label}</span>
+        <span style={styles.sliderValue}>
+          {value.toFixed(step < 0.1 ? 2 : 1)}{unit}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        style={styles.rangeInput}
+      />
+      {subtext && <div style={styles.controlSubtext}>{subtext}</div>}
+    </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Observatory Controls
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-interface ObservatoryControlsProps {
+export interface ObservatoryControlsProps {
+  settings?: GalaxyObservatorySettings;
+  onUpdateSettings?: (updates: Partial<GalaxyObservatorySettings>) => void;
+  onResetSettings?: () => void;
+  onPhysicalDiameterChange?: (diameterLy: number) => void;
+  currentPhysicalDiameterLy?: number;
   activePreset?: CameraPreset | null;
   onSelectPreset?: (preset: CameraPreset) => void;
   layers?: GalaxyLayerVisibility;
@@ -68,6 +125,11 @@ interface ObservatoryControlsProps {
 }
 
 function ObservatoryControls({
+  settings = DEFAULT_OBSERVATORY_SETTINGS,
+  onUpdateSettings,
+  onResetSettings,
+  onPhysicalDiameterChange,
+  currentPhysicalDiameterLy,
   activePreset,
   onSelectPreset,
   layers,
@@ -100,42 +162,219 @@ function ObservatoryControls({
 
   return (
     <div>
-      <SectionHeading title="CINEMATIC WAYPOINTS" />
-      <div style={styles.buttonGrid}>
-        {presets.map((p) => (
+      {/* 1. Simulation & Clock Dynamics */}
+      <Divider />
+      <SectionHeading title="SIMULATION & TIME SPEED" />
+      <div style={styles.simControlRow}>
+        <button
+          style={{
+            ...styles.playPauseButton,
+            ...(settings.isPaused ? styles.pausedButton : styles.runningButton),
+          }}
+          onClick={() => onUpdateSettings?.({ isPaused: !settings.isPaused })}
+        >
+          {settings.isPaused ? '▶ RESUME SIMULATION' : '⏸ PAUSE SIMULATION'}
+        </button>
+      </div>
+      <div style={{ display: 'flex', gap: 4, marginTop: 4, marginBottom: 4 }}>
+        {[0.25, 0.5, 1.0, 2.0, 4.0].map((spd) => (
           <button
-            key={p.id}
+            key={spd}
             style={{
-              ...styles.presetButton,
-              ...(activePreset === p.id ? styles.presetButtonActive : {}),
+              ...styles.speedButton,
+              ...(settings.timeSpeed === spd && !settings.isPaused ? styles.speedButtonActive : {}),
             }}
-            onClick={() => onSelectPreset?.(p.id)}
+            onClick={() => onUpdateSettings?.({ timeSpeed: spd, isPaused: false })}
           >
-            {p.label}
+            {spd}x
           </button>
         ))}
       </div>
-
-      <Divider />
-      <SectionHeading title="LAYER VISIBILITY" />
-      <div style={styles.layerRow}>
-        {layerKeys.map(({ key, label }) => {
-          const isActive = layers ? layers[key] : true;
-          return (
-            <button
-              key={key}
-              style={{
-                ...styles.layerBadge,
-                ...(isActive ? styles.layerBadgeActive : {}),
-              }}
-              onClick={() => onToggleLayer?.(key)}
-            >
-              {label}
-            </button>
-          );
-        })}
+      <div style={styles.controlSubtext}>
+        Time speed scales orbital phase progression, accretion disk, and jet dynamics.
       </div>
 
+      {/* 2. Scale & Radius Architecture */}
+      <Divider />
+      <SectionHeading title="SCALE & RADIUS CONTROLS" />
+      <ControlSlider
+        label="VISUAL RENDERING SCALE"
+        value={settings.renderScale}
+        min={0.25}
+        max={2.5}
+        step={0.05}
+        unit="x"
+        subtext="Optical 3D scene group scale without altering model parsec coordinates."
+        onChange={(v) => onUpdateSettings?.({ renderScale: v })}
+      />
+      <div style={styles.controlGroup}>
+        <div style={styles.sliderHeader}>
+          <span style={styles.sliderLabel}>PHYSICAL MODEL DIAMETER</span>
+          <span style={styles.sliderValue}>
+            {((currentPhysicalDiameterLy ?? 500000) / 1000).toFixed(0)}k ly
+          </span>
+        </div>
+        <div style={styles.modelDiameterGrid}>
+          {[
+            { ly: 100000, label: '100k ly (Milky Way)' },
+            { ly: 250000, label: '250k ly (Intermediate)' },
+            { ly: 500000, label: '500k ly (ANANTARA α)' },
+            { ly: 1000000, label: '1M ly (Supergiant)' },
+          ].map((m) => {
+            const isSelected = (currentPhysicalDiameterLy ?? 500000) === m.ly;
+            return (
+              <button
+                key={m.ly}
+                style={{
+                  ...styles.diameterButton,
+                  ...(isSelected ? styles.diameterButtonActive : {}),
+                }}
+                onClick={() => onPhysicalDiameterChange?.(m.ly)}
+              >
+                {m.label}
+              </button>
+            );
+          })}
+        </div>
+        <div style={styles.controlSubtext}>
+          Regenerates astronomical entity &amp; recomputes physical parsec coordinates.
+        </div>
+      </div>
+
+      {/* 3. Rotation Dynamics */}
+      <Divider />
+      <SectionHeading title="ROTATION CONTROLS" />
+      <ControlSlider
+        label="RIGID VISUAL ROTATION"
+        value={settings.visualRotationSpeed}
+        min={0.0}
+        max={3.0}
+        step={0.1}
+        unit="x"
+        subtext="Rigid-body kinematic orientation spin around galactic polar axis."
+        onChange={(v) => onUpdateSettings?.({ visualRotationSpeed: v })}
+      />
+      <ControlSlider
+        label="STELLAR ORBITAL DYNAMICS"
+        value={settings.orbitalMotionSpeed}
+        min={0.0}
+        max={3.0}
+        step={0.1}
+        unit="x"
+        subtext="Physically motivated accretion disk velocities, jet knots & stellar twinkling."
+        onChange={(v) => onUpdateSettings?.({ orbitalMotionSpeed: v })}
+      />
+
+      {/* 4. Camera Distance & FOV */}
+      <Divider />
+      <SectionHeading title="CAMERA OBSERVATION CONTROLS" />
+      <ControlSlider
+        label="VIEWING DISTANCE"
+        value={settings.cameraDistanceMultiplier}
+        min={0.3}
+        max={3.0}
+        step={0.05}
+        unit="x"
+        subtext="Scales camera distance along look-at vector preserving star target."
+        onChange={(v) => onUpdateSettings?.({ cameraDistanceMultiplier: v })}
+      />
+      <ControlSlider
+        label="OPTICAL FIELD OF VIEW (FOV)"
+        value={settings.cameraFov}
+        min={25}
+        max={90}
+        step={1}
+        unit="°"
+        subtext="Adjusts perspective camera lens angle without breaking navigation."
+        onChange={(v) => onUpdateSettings?.({ cameraFov: v })}
+      />
+
+      <div style={{ marginTop: 6 }}>
+        <div style={styles.sliderLabel}>CINEMATIC WAYPOINTS</div>
+        <div style={styles.buttonGrid}>
+          {presets.map((p) => (
+            <button
+              key={p.id}
+              style={{
+                ...styles.presetButton,
+                ...(activePreset === p.id ? styles.presetButtonActive : {}),
+              }}
+              onClick={() => onSelectPreset?.(p.id)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 5. Optics, Density & Layer Controls */}
+      <Divider />
+      <SectionHeading title="OPTICS & LAYER CONTROLS" />
+      <ControlSlider
+        label="STELLAR POINT SIZE"
+        value={settings.starSizeMultiplier}
+        min={0.5}
+        max={2.5}
+        step={0.1}
+        unit="x"
+        subtext="Dual-profile optical shader star rendering point size."
+        onChange={(v) => onUpdateSettings?.({ starSizeMultiplier: v })}
+      />
+      <ControlSlider
+        label="HALO ENVELOPE OPACITY"
+        value={settings.haloOpacity}
+        min={0.0}
+        max={2.0}
+        step={0.1}
+        unit="x"
+        subtext="Smooth Population II extended halo envelope opacity."
+        onChange={(v) => onUpdateSettings?.({ haloOpacity: v })}
+      />
+      <ControlSlider
+        label="DARK DUST EXTINCTION OPACITY"
+        value={settings.dustOpacity}
+        min={0.0}
+        max={2.0}
+        step={0.1}
+        unit="x"
+        subtext="Spiral arm & bar shock dust extinction lane opacity."
+        onChange={(v) => onUpdateSettings?.({ dustOpacity: v })}
+      />
+      <div style={{ marginTop: 4 }}>
+        <div style={styles.sliderLabel}>LAYER VISIBILITY TOGGLES</div>
+        <div style={styles.layerRow}>
+          {layerKeys.map(({ key, label }) => {
+            const isActive = layers ? layers[key] : true;
+            return (
+              <button
+                key={key}
+                style={{
+                  ...styles.layerBadge,
+                  ...(isActive ? styles.layerBadgeActive : {}),
+                }}
+                onClick={() => onToggleLayer?.(key)}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 6. Reset Controls */}
+      <Divider />
+      <SectionHeading title="DEFAULTS & CALIBRATION" />
+      <button
+        style={styles.resetButton}
+        onClick={onResetSettings}
+      >
+        ↺ RESET OBSERVATORY DEFAULTS
+      </button>
+      <div style={styles.controlSubtext}>
+        Restores canonical 500k ly model, 1.0x scales, standard FOV and layers without modifying seed.
+      </div>
+
+      {/* 7. Telemetry */}
       {telemetry && (
         <>
           <Divider />
@@ -161,6 +400,11 @@ interface GalaxyInfoProps {
   layers?: GalaxyLayerVisibility;
   onToggleLayer?: (layer: keyof GalaxyLayerVisibility) => void;
   telemetry?: GalaxyTelemetry;
+  observatorySettings?: GalaxyObservatorySettings;
+  onUpdateObservatorySettings?: (updates: Partial<GalaxyObservatorySettings>) => void;
+  onResetObservatorySettings?: () => void;
+  onPhysicalDiameterChange?: (diameterLy: number) => void;
+  currentPhysicalDiameterLy?: number;
 }
 
 function GalaxyInfo({
@@ -171,6 +415,11 @@ function GalaxyInfo({
   layers,
   onToggleLayer,
   telemetry,
+  observatorySettings,
+  onUpdateObservatorySettings,
+  onResetObservatorySettings,
+  onPhysicalDiameterChange,
+  currentPhysicalDiameterLy,
 }: GalaxyInfoProps) {
   const isBarred = galaxy.bar !== undefined;
   const armNames = galaxy.spiralArmDefinitions
@@ -215,7 +464,7 @@ function GalaxyInfo({
         <InfoRow label="RADIUS" value={`${galaxy.radius.toFixed(1)} kpc`} />
       )}
       <div style={styles.disclaimerNote}>
-        *Main stellar diameter (500k ly) excludes circumgalactic radio lobes &amp; faint halo.
+        *Main stellar diameter excludes circumgalactic radio lobes &amp; faint halo envelope.
       </div>
       {galaxy.bar && (
         <InfoRow
@@ -255,6 +504,11 @@ function GalaxyInfo({
 
       <Divider />
       <ObservatoryControls
+        settings={observatorySettings}
+        onUpdateSettings={onUpdateObservatorySettings}
+        onResetSettings={onResetObservatorySettings}
+        onPhysicalDiameterChange={onPhysicalDiameterChange}
+        currentPhysicalDiameterLy={currentPhysicalDiameterLy ?? galaxy.diskStructure?.mainDiskDiameterLy}
         activePreset={activePreset}
         onSelectPreset={onSelectPreset}
         layers={layers}
@@ -520,6 +774,11 @@ export interface UnifiedInfoPanelProps {
   layers?: GalaxyLayerVisibility;
   onToggleLayer?: (layer: keyof GalaxyLayerVisibility) => void;
   telemetry?: GalaxyTelemetry;
+  observatorySettings?: GalaxyObservatorySettings;
+  onUpdateObservatorySettings?: (updates: Partial<GalaxyObservatorySettings>) => void;
+  onResetObservatorySettings?: () => void;
+  onPhysicalDiameterChange?: (diameterLy: number) => void;
+  currentPhysicalDiameterLy?: number;
 }
 
 export function UnifiedInfoPanel({
@@ -538,6 +797,11 @@ export function UnifiedInfoPanel({
   layers,
   onToggleLayer,
   telemetry,
+  observatorySettings,
+  onUpdateObservatorySettings,
+  onResetObservatorySettings,
+  onPhysicalDiameterChange,
+  currentPhysicalDiameterLy,
 }: UnifiedInfoPanelProps) {
   // System view: show celestial body info
   if (inSystemView && selectedBody) {
@@ -604,6 +868,11 @@ export function UnifiedInfoPanel({
         layers={layers}
         onToggleLayer={onToggleLayer}
         telemetry={telemetry}
+        observatorySettings={observatorySettings}
+        onUpdateObservatorySettings={onUpdateObservatorySettings}
+        onResetObservatorySettings={onResetObservatorySettings}
+        onPhysicalDiameterChange={onPhysicalDiameterChange}
+        currentPhysicalDiameterLy={currentPhysicalDiameterLy}
       />
     );
   }
@@ -800,5 +1069,127 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 10,
     lineHeight: 1.5,
     color: 'rgba(180, 210, 245, 0.75)',
+  },
+  controlGroup: {
+    margin: '6px 0',
+  },
+  sliderHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  sliderLabel: {
+    fontSize: 9,
+    color: 'rgba(150, 190, 240, 0.75)',
+    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    letterSpacing: 0.8,
+    textTransform: 'uppercase' as const,
+  },
+  sliderValue: {
+    fontSize: 10,
+    color: '#60a5fa',
+    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    fontWeight: 600,
+  },
+  rangeInput: {
+    width: '100%',
+    height: 4,
+    accentColor: '#38bdf8',
+    cursor: 'pointer',
+    background: 'rgba(30, 50, 90, 0.5)',
+    borderRadius: 2,
+  },
+  controlSubtext: {
+    fontSize: 8.5,
+    lineHeight: 1.3,
+    color: 'rgba(130, 160, 200, 0.5)',
+    fontStyle: 'italic',
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  simControlRow: {
+    display: 'flex',
+    gap: 6,
+    margin: '4px 0',
+  },
+  playPauseButton: {
+    width: '100%',
+    padding: '7px 10px',
+    borderRadius: 6,
+    fontSize: 10,
+    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    fontWeight: 600,
+    letterSpacing: 1,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  runningButton: {
+    background: 'rgba(14, 116, 144, 0.35)',
+    border: '1px solid rgba(56, 189, 248, 0.45)',
+    color: '#7dd3fc',
+  },
+  pausedButton: {
+    background: 'rgba(180, 83, 9, 0.35)',
+    border: '1px solid rgba(245, 158, 11, 0.5)',
+    color: '#fcd34d',
+  },
+  speedButton: {
+    flex: 1,
+    padding: '4px 0',
+    background: 'rgba(25, 40, 70, 0.4)',
+    border: '1px solid rgba(70, 100, 160, 0.25)',
+    borderRadius: 4,
+    color: 'rgba(150, 190, 240, 0.6)',
+    fontSize: 9,
+    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    cursor: 'pointer',
+    textAlign: 'center' as const,
+  },
+  speedButtonActive: {
+    background: 'rgba(37, 99, 235, 0.4)',
+    border: '1px solid rgba(96, 165, 250, 0.6)',
+    color: '#bfdbfe',
+    fontWeight: 600,
+  },
+  modelDiameterGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: 4,
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  diameterButton: {
+    padding: '5px 4px',
+    background: 'rgba(20, 35, 65, 0.4)',
+    border: '1px solid rgba(60, 90, 140, 0.25)',
+    borderRadius: 4,
+    color: 'rgba(140, 175, 220, 0.65)',
+    fontSize: 8.5,
+    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    cursor: 'pointer',
+    textAlign: 'center' as const,
+    transition: 'all 0.15s ease',
+  },
+  diameterButtonActive: {
+    background: 'rgba(30, 64, 175, 0.45)',
+    border: '1px solid rgba(96, 165, 250, 0.6)',
+    color: '#ffffff',
+    fontWeight: 600,
+  },
+  resetButton: {
+    width: '100%',
+    padding: '8px 12px',
+    background: 'rgba(180, 83, 9, 0.18)',
+    border: '1px solid rgba(245, 158, 11, 0.4)',
+    borderRadius: 6,
+    color: '#fef08a',
+    fontSize: 9.5,
+    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    letterSpacing: 1,
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    margin: '4px 0',
   },
 };
