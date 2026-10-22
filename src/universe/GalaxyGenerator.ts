@@ -431,7 +431,8 @@ export function generateGalaxy(
       ? (config.starCount <= 12000 ? 'LOW' : config.starCount <= 30000 ? 'MEDIUM' : 'HIGH')
       : 'MEDIUM'
   );
-  const starCount = config.starCount ?? QUALITY_STAR_COUNTS[resolvedQuality];
+  const rawStarCount = config.starCount ?? QUALITY_STAR_COUNTS[resolvedQuality];
+  const starCount = Math.max(5000, Math.min(100000, rawStarCount));
   const stars = generateBarredGalaxyStars(
     seed,
     rng.fork(2000),
