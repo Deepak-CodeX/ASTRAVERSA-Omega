@@ -153,48 +153,83 @@ export function barredSpiralArmAngle(
  */
 export function createDefaultSpiralArmDefinitions(
   barLength: number,
-  barAngle: number
+  barAngle: number,
+  armCount: number = 4,
+  pitchAngleDeg: number = 13.0,
+  armWidthMult: number = 1.0
 ): SpiralArmDefinition[] {
-  const pitchAngleRad = 13.0 * (Math.PI / 180); // ~13 degrees pitch angle
+  const pitchAngleRad = pitchAngleDeg * (Math.PI / 180);
 
-  return [
-    {
-      name: 'Scutum-Centaurus Arm',
-      armIndex: 0,
-      startRadius: barLength,
-      startAngle: barAngle,
-      pitchAngleRad,
-      widthExpansionCoeff: 0.08,
-      isMajor: true,
-    },
-    {
-      name: 'Perseus Arm',
-      armIndex: 1,
-      startRadius: barLength,
-      startAngle: barAngle + Math.PI,
-      pitchAngleRad,
-      widthExpansionCoeff: 0.08,
-      isMajor: true,
-    },
-    {
-      name: 'Sagittarius-Carina Arm',
-      armIndex: 2,
-      startRadius: barLength * 0.70,
-      startAngle: barAngle + Math.PI * 0.5,
-      pitchAngleRad: 12.0 * (Math.PI / 180),
-      widthExpansionCoeff: 0.07,
-      isMajor: false,
-    },
-    {
-      name: 'Norma-Outer Arm',
-      armIndex: 3,
-      startRadius: barLength * 0.85,
-      startAngle: barAngle + Math.PI * 1.5,
-      pitchAngleRad: 12.5 * (Math.PI / 180),
-      widthExpansionCoeff: 0.075,
-      isMajor: false,
-    },
+  // Exact canonical four major logarithmic spiral arms when using defaults
+  if (armCount === 4 && Math.abs(pitchAngleDeg - 13.0) < 0.001 && Math.abs(armWidthMult - 1.0) < 0.001) {
+    return [
+      {
+        name: 'Scutum-Centaurus Arm',
+        armIndex: 0,
+        startRadius: barLength,
+        startAngle: barAngle,
+        pitchAngleRad,
+        widthExpansionCoeff: 0.08,
+        isMajor: true,
+      },
+      {
+        name: 'Perseus Arm',
+        armIndex: 1,
+        startRadius: barLength,
+        startAngle: barAngle + Math.PI,
+        pitchAngleRad,
+        widthExpansionCoeff: 0.08,
+        isMajor: true,
+      },
+      {
+        name: 'Sagittarius-Carina Arm',
+        armIndex: 2,
+        startRadius: barLength * 0.70,
+        startAngle: barAngle + Math.PI * 0.5,
+        pitchAngleRad: 12.0 * (Math.PI / 180),
+        widthExpansionCoeff: 0.07,
+        isMajor: false,
+      },
+      {
+        name: 'Norma-Outer Arm',
+        armIndex: 3,
+        startRadius: barLength * 0.85,
+        startAngle: barAngle + Math.PI * 1.5,
+        pitchAngleRad: 12.5 * (Math.PI / 180),
+        widthExpansionCoeff: 0.075,
+        isMajor: false,
+      },
+    ];
+  }
+
+  // Generalized arm generation for armCount 2..8
+  const armNames = [
+    'Scutum-Centaurus Arm',
+    'Perseus Arm',
+    'Sagittarius-Carina Arm',
+    'Norma-Outer Arm',
+    'Cygnus-Orion Arm',
+    'Crux-Centaurus Arm',
+    'Vela-Outer Arm',
+    'Hydra-Resonance Arm',
   ];
+
+  const defs: SpiralArmDefinition[] = [];
+  for (let i = 0; i < armCount; i++) {
+    const isMajor = i % 2 === 0;
+    const startRadius = isMajor ? barLength : barLength * 0.75;
+    const angleOffset = (i * 2 * Math.PI) / armCount;
+    defs.push({
+      name: armNames[i] ?? `Spiral Arm ${i + 1}`,
+      armIndex: i,
+      startRadius,
+      startAngle: barAngle + angleOffset,
+      pitchAngleRad,
+      widthExpansionCoeff: (isMajor ? 0.08 : 0.072) * armWidthMult,
+      isMajor,
+    });
+  }
+  return defs;
 }
 
 /**
@@ -261,9 +296,25 @@ export function recalculateSupermassiveBlackHole(
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export interface GalaxyGenerationConfig {
-  quality: QualityLevel;
+  quality?: QualityLevel;
   targetDiameterLy?: number;
   generationVersion?: number;
+  /** Explicit star tracer count (5,000 to 100,000, overrides quality if specified) */
+  starCount?: number;
+  /** Spiral arm count (2 to 8, default 4) */
+  armCount?: number;
+  /** Spiral arm width multiplier (0.3x to 2.5x, default 1.0x) */
+  armWidthMult?: number;
+  /** Spiral arm pitch angle in degrees (6° to 30°, default 13.0°) */
+  armPitchAngleDeg?: number;
+  /** Spiral arm winding factor (0.2 to 1.5, default 0.62) */
+  armWindingFactor?: number;
+  /** Bulge radius fraction of galactic radius (0.05 to 0.30, default 0.13) */
+  bulgeRadiusFraction?: number;
+  /** Extended halo radius multiplier relative to main disk (1.0x to 2.5x, default 1.5x) */
+  haloRadiusMultiplier?: number;
+  /** Star nursery / cluster count (8 to 100, default 36) */
+  clusterCount?: number;
 }
 
 const DEFAULT_CONFIG: GalaxyGenerationConfig = {
@@ -294,7 +345,8 @@ export function generateGalaxy(
     ? config.targetDiameterLy
     : (isCanonicalAnantara ? 500000 : kpcToLightYears(rng.range(12, 18) * 2));
   const radius = lightYearsToKpc(mainDiskDiameterLy / 2);
-  const extendedHaloRadiusKpc = radius * 1.5;
+  const haloRadiusMultiplier = config.haloRadiusMultiplier ?? 1.5;
+  const extendedHaloRadiusKpc = radius * haloRadiusMultiplier;
   const extendedHaloDiameterLy = kpcToLightYears(extendedHaloRadiusKpc * 2);
 
   const thickness = isCanonicalAnantara ? 4.0 : radius * 0.05;
@@ -317,7 +369,7 @@ export function generateGalaxy(
   };
 
   // ── Central Spheroidal Bulge ─────────────────────────────
-  const bulgeRadiusFraction = 0.13; // ~9.96 kpc radius
+  const bulgeRadiusFraction = config.bulgeRadiusFraction ?? 0.13; // ~9.96 kpc radius default
   const bulge: BulgeParams = {
     radiusFraction: bulgeRadiusFraction,
     verticalScale: 2.2, // ~8.8 kpc vertical extent
@@ -336,14 +388,25 @@ export function generateGalaxy(
     extendedHaloDiameterLy,
   };
 
-  // ── Four Principal Spiral Arms ───────────────────────────
-  const spiralArmDefinitions = createDefaultSpiralArmDefinitions(barLength, barAngle);
+  // ── Spiral Arms ──────────────────────────────────────────
+  const armCount = config.armCount ?? 4;
+  const armPitchAngleDeg = config.armPitchAngleDeg ?? 13.0;
+  const armWidthMult = config.armWidthMult ?? 1.0;
+  const armWindingFactor = config.armWindingFactor ?? 0.62;
+
+  const spiralArmDefinitions = createDefaultSpiralArmDefinitions(
+    barLength,
+    barAngle,
+    armCount,
+    armPitchAngleDeg,
+    armWidthMult
+  );
 
   const spiralArms: SpiralArmParams = {
-    armCount: 4,
-    windingFactor: 0.62,
+    armCount,
+    windingFactor: armWindingFactor,
     armOffset: barAngle,
-    armWidth: 0.10,
+    armWidth: 0.10 * armWidthMult,
     armDensity: 0.72,
   };
 
@@ -351,7 +414,7 @@ export function generateGalaxy(
   const nucleus = createSupermassiveBlackHole(4.154e6);
 
   // ── Generate Star Clusters (Nurseries) ───────────────────
-  const clusterCount = 36;
+  const clusterCount = config.clusterCount ?? 36;
   const clusters: StarCluster[] = [];
   const clusterRng = rng.fork(1000);
 
@@ -363,7 +426,12 @@ export function generateGalaxy(
   }
 
   // ── Generate Representative Stars ────────────────────────
-  const starCount = QUALITY_STAR_COUNTS[config.quality];
+  const resolvedQuality: QualityLevel = config.quality ?? (
+    config.starCount !== undefined
+      ? (config.starCount <= 12000 ? 'LOW' : config.starCount <= 30000 ? 'MEDIUM' : 'HIGH')
+      : 'MEDIUM'
+  );
+  const starCount = config.starCount ?? QUALITY_STAR_COUNTS[resolvedQuality];
   const stars = generateBarredGalaxyStars(
     seed,
     rng.fork(2000),
@@ -375,7 +443,8 @@ export function generateGalaxy(
     diskStructure,
     spiralArmDefinitions,
     metallicity,
-    clusters
+    clusters,
+    armWidthMult
   );
 
   // Assign star indices to clusters
@@ -401,7 +470,7 @@ export function generateGalaxy(
     nucleus,
     clusters,
     stars,
-    quality: config.quality,
+    quality: resolvedQuality,
   };
 }
 
@@ -471,7 +540,8 @@ function generateBarredGalaxyStars(
   diskStructure: DiskStructureParams,
   armDefs: SpiralArmDefinition[],
   avgMetallicity: number,
-  _clusters: StarCluster[]
+  _clusters: StarCluster[],
+  armWidthMult: number = 1.0
 ): GalaxyStar[] {
   const stars: GalaxyStar[] = [];
 
@@ -522,7 +592,7 @@ function generateBarredGalaxyStars(
 
     const idealAngle = barredSpiralArmAngle(r, arm.startRadius, arm.startAngle, arm.pitchAngleRad);
     // Tighter arm spine width for crisp, coherent four-arm definition
-    const widthAtR = (arm.startRadius * 0.040 + arm.widthExpansionCoeff * 0.38 * r);
+    const widthAtR = (arm.startRadius * 0.040 + arm.widthExpansionCoeff * 0.38 * r) * armWidthMult;
     const scatter = sRng.gaussian(0, widthAtR);
     // Organic spur branches on ~10% of stars with constant PRNG call sequence
     const spurRoll = sRng.next();

@@ -201,6 +201,7 @@ const DIFFUSE_EMISSION_VERTEX_SHADER = `
 `;
 
 const DIFFUSE_EMISSION_FRAGMENT_SHADER = `
+  uniform float uOpacityMultiplier;
   varying vec3 vColor;
   varying float vOpacity;
 
@@ -212,7 +213,7 @@ const DIFFUSE_EMISSION_FRAGMENT_SHADER = `
 
     // Ultra-smooth exponential falloff for silky, seamless nebular continuum
     float falloff = exp(-dist * 5.0);
-    float alpha = falloff * vOpacity;
+    float alpha = falloff * vOpacity * uOpacityMultiplier;
 
     if (alpha < 0.005) discard;
 
