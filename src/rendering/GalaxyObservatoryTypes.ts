@@ -342,3 +342,29 @@ export const DEFAULT_OBSERVATORY_SETTINGS: Readonly<GalaxyObservatorySettings> =
 export function createDefaultObservatorySettings(): GalaxyObservatorySettings {
   return { ...DEFAULT_OBSERVATORY_SETTINGS };
 }
+
+/**
+ * Compute the count of actively rendered stellar tracers based on enabled layer visibility.
+ *
+ * @param totalStars - Total stars generated in the procedural galaxy domain buffer
+ * @param isBarred - Whether the galaxy possesses a central stellar bar
+ * @param layers - Active layer visibility toggles
+ */
+export function computeActiveRenderedStars(
+  totalStars: number,
+  isBarred: boolean,
+  layers: { disk: boolean; bar: boolean; bulge: boolean }
+): number {
+  if (totalStars <= 0) return 0;
+  const bulgeCount = isBarred ? Math.floor(totalStars * 0.10) : Math.floor(totalStars * 0.15);
+  const barCount = isBarred ? Math.floor(totalStars * 0.16) : 0;
+  const armCount = isBarred ? Math.floor(totalStars * 0.54) : Math.floor(totalStars * 0.60);
+  const fieldCount = Math.max(0, totalStars - bulgeCount - barCount - armCount);
+
+  let active = 0;
+  if (layers.bulge) active += bulgeCount;
+  if (layers.bar) active += barCount;
+  if (layers.disk) active += (armCount + fieldCount);
+  return active;
+}
+

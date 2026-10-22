@@ -229,6 +229,37 @@ function GalaxySceneContent({
     prevDistMul.current = newDistMul;
   }, [camera, settings.cameraDistanceMultiplier]);
 
+  // Dynamically update viewing elevation and azimuth angles
+  const prevAngle = useRef({ elevation: settings.cameraViewingAngle, azimuth: settings.cameraAzimuthAngle });
+  useEffect(() => {
+    if (!controlsRef.current) return;
+    const elevation = settings.cameraViewingAngle;
+    const azimuth = settings.cameraAzimuthAngle;
+    if (
+      elevation !== undefined &&
+      azimuth !== undefined &&
+      (prevAngle.current.elevation !== elevation || prevAngle.current.azimuth !== azimuth)
+    ) {
+      const target = controlsRef.current.target;
+      const offset = camera.position.clone().sub(target);
+      const currentRadius = Math.max(offset.length(), 10);
+
+      // Polar angle phi measured from positive Y axis
+      const phi = (90 - elevation) * (Math.PI / 180);
+      const theta = azimuth * (Math.PI / 180);
+
+      const clampedPhi = Math.max(0.01, Math.min(Math.PI - 0.01, phi));
+      const x = currentRadius * Math.sin(clampedPhi) * Math.sin(theta);
+      const y = currentRadius * Math.cos(clampedPhi);
+      const z = currentRadius * Math.sin(clampedPhi) * Math.cos(theta);
+
+      camera.position.set(target.x + x, target.y + y, target.z + z);
+      camera.lookAt(target);
+      controlsRef.current.update();
+      prevAngle.current = { elevation, azimuth };
+    }
+  }, [camera, settings.cameraViewingAngle, settings.cameraAzimuthAngle]);
+
   // Helper to compute preset positions
   const getPresetVectors = (preset: CameraPreset): { pos: THREE.Vector3; target: THREE.Vector3 } => {
     const R = galaxy.radius * RENDER_SCALE_KPC;

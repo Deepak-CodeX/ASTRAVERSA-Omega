@@ -147,14 +147,30 @@ describe('Galaxy Observatory System', () => {
       expect(DEFAULT_OBSERVATORY_SETTINGS).toEqual({
         renderScale: 1.0,
         targetDiameterLy: 500000,
+        armCount: 4,
+        armPitchAngleDeg: 13.0,
+        armWidthMult: 1.0,
+        armWindingFactor: 0.62,
+        bulgeRadiusFraction: 0.13,
+        haloRadiusMultiplier: 1.5,
+        starCount: 20000,
+        starSizeMultiplier: 1.0,
+        clusterCount: 36,
+        clusterDensityMultiplier: 1.0,
+        cloudCount: 14000,
+        cloudCoverage: 1.0,
+        cloudOpacity: 1.0,
+        dustCount: 4800,
+        dustCoverage: 1.0,
+        dustOpacity: 0.50,
+        haloOpacity: 0.35,
         visualRotationSpeed: 1.0,
         orbitalMotionSpeed: 1.0,
         isPaused: false,
         timeSpeed: 1.0,
-        starSizeMultiplier: 1.0,
-        haloOpacity: 0.35,
-        dustOpacity: 0.50,
         cameraDistanceMultiplier: 1.0,
+        cameraViewingAngle: 38.0,
+        cameraAzimuthAngle: 45.0,
         cameraFov: 52,
       });
 
@@ -289,6 +305,159 @@ describe('Galaxy Observatory System', () => {
       expect(system).toBeDefined();
       expect(system?.bodies.length).toBeGreaterThan(0);
     });
+
+    it('accurately computes active rendered stars as layers are toggled', async () => {
+      const { computeActiveRenderedStars } = await import('../src/rendering');
+
+      const total = 20000;
+      const isBarred = true;
+
+      // 1. All layers enabled -> 100% active
+      const allActive = computeActiveRenderedStars(total, isBarred, {
+        bulge: true,
+        bar: true,
+        disk: true,
+      });
+      expect(allActive).toBe(total);
+
+      // 2. Disk layer disabled -> bulge (10%) + bar (16%) = 26% = 5200 active
+      const noDisk = computeActiveRenderedStars(total, isBarred, {
+        bulge: true,
+        bar: true,
+        disk: false,
+      });
+      expect(noDisk).toBe(Math.floor(total * 0.10) + Math.floor(total * 0.16));
+      expect(noDisk).toBe(5200);
+
+      // 3. Bar layer disabled -> bulge (10%) + disk (74%) = 84% = 16800 active
+      const noBar = computeActiveRenderedStars(total, isBarred, {
+        bulge: true,
+        bar: false,
+        disk: true,
+      });
+      expect(noBar).toBe(total - Math.floor(total * 0.16));
+      expect(noBar).toBe(16800);
+
+      // 4. Bulge layer disabled -> bar (16%) + disk (74%) = 90% = 18000 active
+      const noBulge = computeActiveRenderedStars(total, isBarred, {
+        bulge: false,
+        bar: true,
+        disk: true,
+      });
+      expect(noBulge).toBe(total - Math.floor(total * 0.10));
+      expect(noBulge).toBe(18000);
+
+      // 5. All disabled -> 0 active
+      const allDisabled = computeActiveRenderedStars(total, isBarred, {
+        bulge: false,
+        bar: false,
+        disk: false,
+      });
+      expect(allDisabled).toBe(0);
+
+      // 6. Zero or negative stars handled safely
+      expect(computeActiveRenderedStars(0, isBarred, { bulge: true, bar: true, disk: true })).toBe(0);
+    });
+
+    it('procedurally regenerates varying spiral arm counts and geometry deterministically', () => {
+      // 2-arm Grand Design
+      const galaxy2Arms = generateGalaxy(42, { quality: 'LOW', armCount: 2 });
+      expect(galaxy2Arms.spiralArms.armCount).toBe(2);
+      expect(galaxy2Arms.spiralArmDefinitions).toBeDefined();
+      expect(galaxy2Arms.spiralArmDefinitions?.length).toBe(2);
+
+      // 6-arm Flocculent
+      const galaxy6Arms = generateGalaxy(42, { quality: 'LOW', armCount: 6 });
+      expect(galaxy6Arms.spiralArms.armCount).toBe(6);
+      expect(galaxy6Arms.spiralArmDefinitions?.length).toBe(6);
+
+      // Custom pitch angle and winding factor
+      const customArms = generateGalaxy(42, {
+        quality: 'LOW',
+        armCount: 3,
+        armPitchAngleDeg: 20.0,
+        armWindingFactor: 0.90,
+        armWidthMult: 1.5,
+      });
+      expect(customArms.spiralArms.armCount).toBe(3);
+      expect(customArms.spiralArmDefinitions?.[0].pitchAngleRad).toBeCloseTo(20.0 * (Math.PI / 180), 4);
+      expect(customArms.spiralArms.windingFactor).toBe(0.90);
+      expect(customArms.spiralArms.armWidth).toBeCloseTo(0.10 * 1.5, 4);
+    });
+
+    it('procedurally scales explicit star counts and cluster counts', () => {
+      // Low tracer count (8,000 stars)
+      const galaxy8k = generateGalaxy(42, { starCount: 8000, clusterCount: 16 });
+      expect(galaxy8k.stars.length).toBe(8000);
+      expect(galaxy8k.clusters.length).toBe(16);
+      expect(galaxy8k.stars[0].id).toBe('gs-42-0');
+      expect(galaxy8k.stars[7999].id).toBe('gs-42-7999');
+
+      // High tracer count (35,000 stars)
+      const galaxy35k = generateGalaxy(42, { starCount: 35000, clusterCount: 50 });
+      expect(galaxy35k.stars.length).toBe(35000);
+      expect(galaxy35k.clusters.length).toBe(50);
+      expect(galaxy35k.stars[0].id).toBe('gs-42-0');
+      expect(galaxy35k.stars[34999].id).toBe('gs-42-34999');
+
+      // Star seed determinism preserved across different counts
+      expect(galaxy8k.stars[0].seed).toBe(galaxy35k.stars[0].seed);
+      expect(galaxy8k.stars[100].seed).toBe(galaxy35k.stars[100].seed);
+    });
+
+    it('procedurally scales bulge fraction and halo multiplier', () => {
+      const customMorphology = generateGalaxy(42, {
+        quality: 'LOW',
+        targetDiameterLy: 500000,
+        bulgeRadiusFraction: 0.22,
+        haloRadiusMultiplier: 2.0,
+      });
+
+      // Bulge radius fraction is 0.22 of galactic radius
+      expect(customMorphology.bulge.radiusFraction).toBeCloseTo(0.22, 2);
+
+      // Extended halo is 2.0x main disk diameter (1,000,000 ly)
+      expect(customMorphology.diskStructure?.extendedHaloDiameterLy).toBeCloseTo(1000000, 0);
+      expect(customMorphology.diskStructure?.mainDiskDiameterLy).toBeCloseTo(500000, 0);
+    });
+
+    it('correctly maps spherical elevation and azimuth angles to 3D Cartesian coordinates', () => {
+      const currentRadius = 1000;
+      const target = { x: 0, y: 0, z: 0 };
+
+      // Helper function matching GalaxyScene kinematics
+      const computeSphericalPos = (elevationDeg: number, azimuthDeg: number) => {
+        const phi = (90 - elevationDeg) * (Math.PI / 180);
+        const theta = azimuthDeg * (Math.PI / 180);
+        const clampedPhi = Math.max(0.01, Math.min(Math.PI - 0.01, phi));
+        return {
+          x: target.x + currentRadius * Math.sin(clampedPhi) * Math.sin(theta),
+          y: target.y + currentRadius * Math.cos(clampedPhi),
+          z: target.z + currentRadius * Math.sin(clampedPhi) * Math.cos(theta),
+        };
+      };
+
+      // 1. Edge-on view (elevation 0°, azimuth 0°) -> y ~ 0, z ~ currentRadius
+      const edgeOn = computeSphericalPos(0, 0);
+      expect(edgeOn.y).toBeCloseTo(0, 3);
+      expect(edgeOn.z).toBeCloseTo(currentRadius, 3);
+      expect(edgeOn.x).toBeCloseTo(0, 3);
+
+      // 2. North Pole top-down (elevation 85°, azimuth 0°) -> high y, small z
+      const topDown = computeSphericalPos(85, 0);
+      expect(topDown.y).toBeGreaterThan(990);
+      expect(topDown.z).toBeLessThan(100);
+
+      // 3. South Pole (elevation -85°, azimuth 0°) -> negative y
+      const southPole = computeSphericalPos(-85, 0);
+      expect(southPole.y).toBeLessThan(-990);
+
+      // 4. Azimuth 90° rotation (elevation 0°, azimuth 90°) -> x ~ currentRadius, z ~ 0
+      const azimuth90 = computeSphericalPos(0, 90);
+      expect(azimuth90.x).toBeCloseTo(currentRadius, 3);
+      expect(azimuth90.z).toBeCloseTo(0, 3);
+    });
   });
 });
+
 

@@ -23,6 +23,7 @@ import {
   type GalaxyLayerVisibility,
   type GalaxyObservatorySettings,
   createDefaultObservatorySettings,
+  computeActiveRenderedStars,
 } from '../rendering';
 import { TimeControls } from './TimeControls';
 import { UnifiedInfoPanel } from './GalaxyInfoPanel';
@@ -68,6 +69,20 @@ export function App() {
     createDefaultObservatorySettings()
   );
   const [currentPhysicalDiameterLy, setCurrentPhysicalDiameterLy] = useState<number>(500000);
+  const [isRegenerating, setIsRegenerating] = useState<boolean>(false);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstMountRef = useRef<boolean>(true);
+  const lastGeneratedConfigRef = useRef({
+    targetDiameterLy: 500000,
+    starCount: 20000,
+    armCount: 4,
+    armPitchAngleDeg: 13.0,
+    armWidthMult: 1.0,
+    armWindingFactor: 0.62,
+    bulgeRadiusFraction: 0.13,
+    haloRadiusMultiplier: 1.5,
+    clusterCount: 36,
+  });
 
   const inSystemView = viewLevel === ViewLevel.SYSTEM;
 
@@ -143,24 +158,142 @@ export function App() {
 
   const handlePhysicalDiameterChange = useCallback((diameterLy: number) => {
     setCurrentPhysicalDiameterLy(diameterLy);
-    universe.generateGalaxy({ targetDiameterLy: diameterLy, quality: 'MEDIUM' as const });
+    setObservatorySettings(prev => ({ ...prev, targetDiameterLy: diameterLy }));
+  }, []);
+
+  // Debounced procedural galaxy regeneration for structural / model parameters
+  const {
+    targetDiameterLy,
+    starCount,
+    armCount,
+    armPitchAngleDeg,
+    armWidthMult,
+    armWindingFactor,
+    bulgeRadiusFraction,
+    haloRadiusMultiplier,
+    clusterCount,
+  } = observatorySettings;
+
+  useEffect(() => {
+    if (isFirstMountRef.current) {
+      isFirstMountRef.current = false;
+      return;
+    }
+
+    const prev = lastGeneratedConfigRef.current;
+    const isSame =
+      prev.targetDiameterLy === targetDiameterLy &&
+      prev.starCount === starCount &&
+      prev.armCount === armCount &&
+      prev.armPitchAngleDeg === armPitchAngleDeg &&
+      prev.armWidthMult === armWidthMult &&
+      prev.armWindingFactor === armWindingFactor &&
+      prev.bulgeRadiusFraction === bulgeRadiusFraction &&
+      prev.haloRadiusMultiplier === haloRadiusMultiplier &&
+      prev.clusterCount === clusterCount;
+
+    if (isSame) return;
+
+    setIsRegenerating(true);
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      universe.generateGalaxy({
+        targetDiameterLy,
+        starCount,
+        armCount,
+        armPitchAngleDeg,
+        armWidthMult,
+        armWindingFactor,
+        bulgeRadiusFraction,
+        haloRadiusMultiplier,
+        clusterCount,
+        quality: 'MEDIUM',
+      });
+      lastGeneratedConfigRef.current = {
+        targetDiameterLy,
+        starCount,
+        armCount,
+        armPitchAngleDeg,
+        armWidthMult,
+        armWindingFactor,
+        bulgeRadiusFraction,
+        haloRadiusMultiplier,
+        clusterCount,
+      };
+      setCurrentPhysicalDiameterLy(targetDiameterLy);
+      setSelectedStarIndex(null);
+      setIsRegenerating(false);
+      setTick(t => t + 1);
+    }, 120);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [
+    targetDiameterLy,
+    starCount,
+    armCount,
+    armPitchAngleDeg,
+    armWidthMult,
+    armWindingFactor,
+    bulgeRadiusFraction,
+    haloRadiusMultiplier,
+    clusterCount,
+    universe,
+  ]);
+
+  const handleResetObservatorySettings = useCallback(() => {
+    const defaults = createDefaultObservatorySettings();
+    setObservatorySettings(defaults);
+    setLayers(DEFAULT_LAYER_VISIBILITY);
+    setActivePreset('overview');
+    setCurrentPhysicalDiameterLy(defaults.targetDiameterLy);
     setSelectedStarIndex(null);
     setSelectedNucleus(false);
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    universe.generateGalaxy({
+      targetDiameterLy: defaults.targetDiameterLy,
+      starCount: defaults.starCount,
+      armCount: defaults.armCount,
+      armPitchAngleDeg: defaults.armPitchAngleDeg,
+      armWidthMult: defaults.armWidthMult,
+      armWindingFactor: defaults.armWindingFactor,
+      bulgeRadiusFraction: defaults.bulgeRadiusFraction,
+      haloRadiusMultiplier: defaults.haloRadiusMultiplier,
+      clusterCount: defaults.clusterCount,
+      quality: 'MEDIUM',
+    });
+
+    lastGeneratedConfigRef.current = {
+      targetDiameterLy: defaults.targetDiameterLy,
+      starCount: defaults.starCount,
+      armCount: defaults.armCount,
+      armPitchAngleDeg: defaults.armPitchAngleDeg,
+      armWidthMult: defaults.armWidthMult,
+      armWindingFactor: defaults.armWindingFactor,
+      bulgeRadiusFraction: defaults.bulgeRadiusFraction,
+      haloRadiusMultiplier: defaults.haloRadiusMultiplier,
+      clusterCount: defaults.clusterCount,
+    };
+    setIsRegenerating(false);
     setTick(t => t + 1);
   }, [universe]);
 
-  const handleResetObservatorySettings = useCallback(() => {
-    setObservatorySettings(createDefaultObservatorySettings());
-    setLayers(DEFAULT_LAYER_VISIBILITY);
-    setActivePreset('overview');
-    if (currentPhysicalDiameterLy !== 500000) {
-      setCurrentPhysicalDiameterLy(500000);
-      universe.generateGalaxy({ targetDiameterLy: 500000, quality: 'MEDIUM' as const });
-    }
-    setSelectedStarIndex(null);
-    setSelectedNucleus(false);
-    setTick(t => t + 1);
-  }, [universe, currentPhysicalDiameterLy]);
+  // Compute active rendered stars based on enabled visual layers
+  const activeRenderedStars = useMemo(() => {
+    if (!galaxy) return 0;
+    return computeActiveRenderedStars(galaxy.stars.length, galaxy.bar !== undefined, layers);
+  }, [galaxy, layers.bulge, layers.bar, layers.disk]);
 
   // ── System View Handlers ────────────────────────
 
@@ -303,6 +436,8 @@ export function App() {
         onResetObservatorySettings={handleResetObservatorySettings}
         onPhysicalDiameterChange={handlePhysicalDiameterChange}
         currentPhysicalDiameterLy={currentPhysicalDiameterLy}
+        activeRenderedStars={activeRenderedStars}
+        isRegenerating={isRegenerating}
       />
     </div>
   );

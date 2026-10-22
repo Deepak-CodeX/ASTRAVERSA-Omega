@@ -23,5 +23,6 @@ export {
   type GalaxyObservatorySettings,
   DEFAULT_OBSERVATORY_SETTINGS,
   createDefaultObservatorySettings,
+  computeActiveRenderedStars,
 } from './GalaxyObservatoryTypes';
 

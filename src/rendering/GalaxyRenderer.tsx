@@ -557,10 +557,17 @@ function GalaxyStarField({
 
 interface DustFieldProps {
   galaxy: Galaxy;
+  dustCount?: number;
+  dustCoverage?: number;
   opacityMultiplier?: number;
 }
 
-function DustField({ galaxy, opacityMultiplier = 1.0 }: DustFieldProps) {
+function DustField({
+  galaxy,
+  dustCount = 4800,
+  dustCoverage = 1.0,
+  opacityMultiplier = 1.0,
+}: DustFieldProps) {
   const { geometry, material } = useMemo(() => {
     const rng = new SeededRandom(galaxy.seed + 777);
     const armDefs = galaxy.spiralArmDefinitions;
@@ -570,15 +577,15 @@ function DustField({ galaxy, opacityMultiplier = 1.0 }: DustFieldProps) {
     const diskThickness = galaxy.thickness;
     const bar = galaxy.bar;
 
-    // Generate ~4,800 dark dust tracers tracing spiral arm compression and bar shocks
-    const dustCount = Math.min(5200, Math.max(2400, Math.floor(galaxy.stars.length * 0.22)));
-    const positions = new Float32Array(dustCount * 3);
-    const colors = new Float32Array(dustCount * 3);
-    const sizes = new Float32Array(dustCount);
-    const opacities = new Float32Array(dustCount);
+    // Configurable dark dust tracers tracing spiral arm compression and bar shocks
+    const actualDustCount = Math.max(1000, Math.min(20000, dustCount));
+    const positions = new Float32Array(actualDustCount * 3);
+    const colors = new Float32Array(actualDustCount * 3);
+    const sizes = new Float32Array(actualDustCount);
+    const opacities = new Float32Array(actualDustCount);
 
-    const barDustCount = bar ? Math.floor(dustCount * 0.25) : 0;
-    const armDustCount = dustCount - barDustCount;
+    const barDustCount = bar ? Math.floor(actualDustCount * 0.25) : 0;
+    const armDustCount = actualDustCount - barDustCount;
 
     // 1. Bar-leading shock dust lanes (curved dust lanes on leading edges of the rotating bar)
     if (bar && barDustCount > 0) {
@@ -593,7 +600,7 @@ function DustField({ galaxy, opacityMultiplier = 1.0 }: DustFieldProps) {
         const u = rng.range(-a * 0.95, a * 0.95);
         // Leading edge: shock lane offset v on leading side relative to rotation
         const sideSign = u >= 0 ? 1 : -1;
-        const v = sideSign * b * 0.42 + rng.gaussian(0, b * 0.16);
+        const v = sideSign * b * 0.42 * dustCoverage + rng.gaussian(0, b * 0.16 * dustCoverage);
         const w = rng.gaussian(0, bar.thickness * 0.18);
 
         // Rotate into galactic plane coordinates
@@ -611,7 +618,7 @@ function DustField({ galaxy, opacityMultiplier = 1.0 }: DustFieldProps) {
         colors[i * 3 + 1] = tone * 1.3;
         colors[i * 3 + 2] = tone * 0.6;
 
-        sizes[i] = rng.range(8.0, 18.0);
+        sizes[i] = rng.range(8.0, 18.0) * Math.sqrt(dustCoverage);
         opacities[i] = rng.range(0.40, 0.70);
       }
     }
@@ -628,7 +635,7 @@ function DustField({ galaxy, opacityMultiplier = 1.0 }: DustFieldProps) {
         const armIndex = i % armDefs.length;
         const arm = armDefs[armIndex];
         const idealAngle = arm.startAngle + (1.0 / Math.tan(arm.pitchAngleRad)) * Math.log(Math.max(r, 0.1) / Math.max(arm.startRadius, 0.1));
-        const armWidthKpc = arm.startRadius * 0.035 + arm.widthExpansionCoeff * 0.30 * r;
+        const armWidthKpc = (arm.startRadius * 0.035 + arm.widthExpansionCoeff * 0.30 * r) * dustCoverage;
         // Shift to inner concave edge of the density wave
         const dustOffset = -armWidthKpc * 0.45 + rng.gaussian(0, armWidthKpc * 0.22);
         theta = idealAngle + dustOffset / Math.max(r, 0.5);
@@ -636,7 +643,7 @@ function DustField({ galaxy, opacityMultiplier = 1.0 }: DustFieldProps) {
         const armIndex = i % armCount;
         const armPhase = galaxy.spiralArms.armOffset + (armIndex * Math.PI * 2) / armCount;
         const idealAngle = windingFactor * Math.log(Math.max(r, 0.1) / 0.5) + armPhase;
-        const armWidthKpc = galaxy.spiralArms.armWidth * galaxyRadius * 0.35;
+        const armWidthKpc = galaxy.spiralArms.armWidth * galaxyRadius * 0.35 * dustCoverage;
         const dustOffset = -armWidthKpc * 0.45 + rng.gaussian(0, armWidthKpc * 0.22);
         theta = idealAngle + dustOffset / Math.max(r, 0.5);
       }
@@ -651,7 +658,7 @@ function DustField({ galaxy, opacityMultiplier = 1.0 }: DustFieldProps) {
       colors[idx * 3 + 1] = tone * 1.2;
       colors[idx * 3 + 2] = tone * 0.55;
 
-      sizes[idx] = rng.range(7.0, 16.0);
+      sizes[idx] = rng.range(7.0, 16.0) * Math.sqrt(dustCoverage);
       opacities[idx] = rng.range(0.35, 0.65);
     }
 
@@ -675,7 +682,7 @@ function DustField({ galaxy, opacityMultiplier = 1.0 }: DustFieldProps) {
     });
 
     return { geometry: geom, material: mat };
-  }, [galaxy]);
+  }, [galaxy, dustCount, dustCoverage]);
 
   useFrame(() => {
     if (material && material.uniforms && material.uniforms.uOpacityMultiplier) {
@@ -692,12 +699,13 @@ function DustField({ galaxy, opacityMultiplier = 1.0 }: DustFieldProps) {
 
 interface ClusterFieldProps {
   galaxy: Galaxy;
+  densityMultiplier?: number;
 }
 
-function ClusterField({ galaxy }: ClusterFieldProps) {
+function ClusterField({ galaxy, densityMultiplier = 1.0 }: ClusterFieldProps) {
   const { geometry, material } = useMemo(() => {
     const clusters = galaxy.clusters;
-    const particlesPerCluster = 32;
+    const particlesPerCluster = Math.max(8, Math.min(96, Math.round(32 * densityMultiplier)));
     const totalCount = clusters.length * particlesPerCluster;
 
     const positions = new Float32Array(totalCount * 3);
@@ -721,14 +729,14 @@ function ClusterField({ galaxy }: ClusterFieldProps) {
         positions[idx * 3 + 2] = (cluster.z + offsetR * Math.cos(theta) * Math.sin(phi)) * RENDER_SCALE_KPC;
 
         // Ionized hydrogen emission (pink/cyan H II glow) + diamond white OB stars
-        if (p < 10) {
+        if (p < Math.round(10 * (particlesPerCluster / 32))) {
           // Soft H II nebular envelope (pink/magenta H-alpha proxy)
           colors[idx * 3] = 1.0;
           colors[idx * 3 + 1] = 0.32;
           colors[idx * 3 + 2] = 0.62;
           sizes[idx] = rng.range(16.0, 32.0);
           opacities[idx] = 0.24;
-        } else if (p < 14) {
+        } else if (p < Math.round(14 * (particlesPerCluster / 32))) {
           // Ionized oxygen knots (turquoise O III)
           colors[idx * 3] = 0.30;
           colors[idx * 3 + 1] = 0.92;
@@ -765,7 +773,7 @@ function ClusterField({ galaxy }: ClusterFieldProps) {
     });
 
     return { geometry: geom, material: mat };
-  }, [galaxy]);
+  }, [galaxy, densityMultiplier]);
 
   return <points geometry={geometry} material={material} />;
 }
@@ -850,12 +858,21 @@ function GalacticHalo({ galaxy, opacityMultiplier = 0.35 }: GalacticHaloProps) {
 interface DiffuseGalacticEmissionProps {
   galaxy: Galaxy;
   layers: GalaxyLayerVisibility;
+  cloudCount?: number;
+  cloudCoverage?: number;
+  cloudOpacity?: number;
 }
 
-function DiffuseGalacticEmission({ galaxy, layers }: DiffuseGalacticEmissionProps) {
+function DiffuseGalacticEmission({
+  galaxy,
+  layers,
+  cloudCount = 14000,
+  cloudCoverage = 1.0,
+  cloudOpacity = 1.0,
+}: DiffuseGalacticEmissionProps) {
   const { geometry, material } = useMemo(() => {
     const rng = new SeededRandom(galaxy.seed + 5555);
-    const count = 14000;
+    const count = Math.max(2000, Math.min(40000, cloudCount));
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
     const sizes = new Float32Array(count);
@@ -886,9 +903,9 @@ function DiffuseGalacticEmission({ galaxy, layers }: DiffuseGalacticEmissionProp
     const showBulge = layers.bulge;
     const bulgeRadius = galaxyRadius * galaxy.bulge.radiusFraction;
     for (let i = 0; i < bulgeCount; i++) {
-      const u = rng.gaussian(0, bulgeRadius * 0.40);
-      const v = rng.gaussian(0, bulgeRadius * 0.40);
-      const w = rng.gaussian(0, galaxy.thickness * 0.35);
+      const u = rng.gaussian(0, bulgeRadius * 0.40 * cloudCoverage);
+      const v = rng.gaussian(0, bulgeRadius * 0.40 * cloudCoverage);
+      const w = rng.gaussian(0, galaxy.thickness * 0.35 * cloudCoverage);
 
       positions[idx * 3] = u * RENDER_SCALE_KPC;
       positions[idx * 3 + 1] = w * RENDER_SCALE_KPC;
@@ -898,7 +915,7 @@ function DiffuseGalacticEmission({ galaxy, layers }: DiffuseGalacticEmissionProp
         colors[idx * 3] = 1.0;
         colors[idx * 3 + 1] = 0.78 + rng.next() * 0.10;
         colors[idx * 3 + 2] = 0.45 + rng.next() * 0.15;
-        sizes[idx] = rng.range(22.0, 48.0);
+        sizes[idx] = rng.range(22.0, 48.0) * Math.sqrt(cloudCoverage);
         opacities[idx] = rng.range(0.12, 0.24);
       } else {
         sizes[idx] = 0;
@@ -913,9 +930,9 @@ function DiffuseGalacticEmission({ galaxy, layers }: DiffuseGalacticEmissionProp
       const a = bar.length * 0.5;
       const b = bar.width * 0.5;
       for (let i = 0; i < barCount; i++) {
-        const u = rng.gaussian(0, a * 0.52);
-        const v = rng.gaussian(0, b * 0.40);
-        const w = rng.gaussian(0, bar.thickness * 0.28);
+        const u = rng.gaussian(0, a * 0.52 * cloudCoverage);
+        const v = rng.gaussian(0, b * 0.40 * cloudCoverage);
+        const w = rng.gaussian(0, bar.thickness * 0.28 * cloudCoverage);
 
         const x = u * cosPhi - v * sinPhi;
         const z = u * sinPhi + v * cosPhi;
@@ -929,7 +946,7 @@ function DiffuseGalacticEmission({ galaxy, layers }: DiffuseGalacticEmissionProp
           colors[idx * 3] = 1.0;
           colors[idx * 3 + 1] = 0.82 + rng.next() * 0.08;
           colors[idx * 3 + 2] = 0.52 + rng.next() * 0.18;
-          sizes[idx] = rng.range(18.0, 38.0);
+          sizes[idx] = rng.range(18.0, 38.0) * Math.sqrt(cloudCoverage);
           opacities[idx] = rng.range(0.10, 0.20);
         } else {
           sizes[idx] = 0;
@@ -953,11 +970,11 @@ function DiffuseGalacticEmission({ galaxy, layers }: DiffuseGalacticEmissionProp
       if (armDefs && armDefs.length > 0) {
         const arm = armDefs[armIdx % armDefs.length];
         idealAngle = arm.startAngle + (1.0 / Math.tan(arm.pitchAngleRad)) * Math.log(Math.max(r, 0.1) / Math.max(arm.startRadius, 0.1));
-        armWidthKpc = arm.startRadius * 0.035 + arm.widthExpansionCoeff * 0.30 * r;
+        armWidthKpc = (arm.startRadius * 0.035 + arm.widthExpansionCoeff * 0.30 * r) * cloudCoverage;
       } else {
         const armPhase = galaxy.spiralArms.armOffset + (armIdx * Math.PI * 2) / armCount;
         idealAngle = windingFactor * Math.log(Math.max(r, 0.1) / 0.5) + armPhase;
-        armWidthKpc = galaxy.spiralArms.armWidth * galaxyRadius * 0.4;
+        armWidthKpc = galaxy.spiralArms.armWidth * galaxyRadius * 0.4 * cloudCoverage;
       }
 
       const scatter = rng.gaussian(0, armWidthKpc);
@@ -981,7 +998,7 @@ function DiffuseGalacticEmission({ galaxy, layers }: DiffuseGalacticEmissionProp
           colors[idx * 3 + 1] = 0.82 + (1.0 - radialT) * 0.10;
           colors[idx * 3 + 2] = 1.0;
         }
-        sizes[idx] = rng.range(20.0, 46.0);
+        sizes[idx] = rng.range(20.0, 46.0) * Math.sqrt(cloudCoverage);
         opacities[idx] = rng.range(0.08, 0.18) * (1.0 - radialT * 0.35);
       } else {
         sizes[idx] = 0;
@@ -1008,7 +1025,7 @@ function DiffuseGalacticEmission({ galaxy, layers }: DiffuseGalacticEmissionProp
       }
 
       // Slightly offset on the outer shock ridge
-      const armWidthKpc = (galaxy.spiralArms.armWidth * galaxyRadius) * 0.25;
+      const armWidthKpc = (galaxy.spiralArms.armWidth * galaxyRadius) * 0.25 * cloudCoverage;
       const theta = idealAngle + rng.gaussian(0, armWidthKpc) / Math.max(r, 1.0);
 
       positions[idx * 3] = r * Math.cos(theta) * RENDER_SCALE_KPC;
@@ -1027,7 +1044,7 @@ function DiffuseGalacticEmission({ galaxy, layers }: DiffuseGalacticEmissionProp
           colors[idx * 3 + 1] = 0.38;
           colors[idx * 3 + 2] = 0.65;
         }
-        sizes[idx] = rng.range(16.0, 34.0);
+        sizes[idx] = rng.range(16.0, 34.0) * Math.sqrt(cloudCoverage);
         opacities[idx] = rng.range(0.12, 0.24);
       } else {
         sizes[idx] = 0;
@@ -1047,6 +1064,7 @@ function DiffuseGalacticEmission({ galaxy, layers }: DiffuseGalacticEmissionProp
       fragmentShader: DIFFUSE_EMISSION_FRAGMENT_SHADER,
       uniforms: {
         uPixelRatio: { value: typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 1 },
+        uOpacityMultiplier: { value: cloudOpacity },
       },
       transparent: true,
       depthWrite: false,
@@ -1054,7 +1072,13 @@ function DiffuseGalacticEmission({ galaxy, layers }: DiffuseGalacticEmissionProp
     });
 
     return { geometry: geom, material: mat };
-  }, [galaxy, layers.disk, layers.bar, layers.bulge, layers.clusters]);
+  }, [galaxy, layers.disk, layers.bar, layers.bulge, layers.clusters, cloudCount, cloudCoverage]);
+
+  useFrame(() => {
+    if (material && material.uniforms && material.uniforms.uOpacityMultiplier) {
+      material.uniforms.uOpacityMultiplier.value = cloudOpacity;
+    }
+  });
 
   return <points geometry={geometry} material={material} />;
 }
@@ -1701,7 +1725,13 @@ export function GalaxyRenderer({
       {layers.bulge && <GalacticCoreGlow galaxy={galaxy} />}
 
       {/* 2. Diffuse Galactic Body & Spiral Arm Emission Continuum */}
-      <DiffuseGalacticEmission galaxy={galaxy} layers={layers} />
+      <DiffuseGalacticEmission
+        galaxy={galaxy}
+        layers={layers}
+        cloudCount={settings.cloudCount}
+        cloudCoverage={settings.cloudCoverage}
+        cloudOpacity={settings.cloudOpacity}
+      />
 
       {/* 3. Optional Scientifically Motivated Relativistic Radio Jets & Terminating Lobes */}
       {layers.jets && (
@@ -1728,12 +1758,19 @@ export function GalaxyRenderer({
       )}
 
       {/* 6. Star Clusters (Nurseries & H II Emission) */}
-      {layers.clusters && <ClusterField galaxy={galaxy} />}
+      {layers.clusters && (
+        <ClusterField
+          galaxy={galaxy}
+          densityMultiplier={settings.clusterDensityMultiplier}
+        />
+      )}
 
       {/* 7. Dark Dust Extinction Lanes (Silhouettes against bright diffuse disk & bar) */}
       {layers.dust && (
         <DustField
           galaxy={galaxy}
+          dustCount={settings.dustCount}
+          dustCoverage={settings.dustCoverage}
           opacityMultiplier={settings.dustOpacity}
         />
       )}

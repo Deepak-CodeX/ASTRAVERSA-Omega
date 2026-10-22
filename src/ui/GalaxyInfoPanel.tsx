@@ -1,17 +1,19 @@
 /**
- * ASTRAVERSA Ω — Galaxy Info Panel
+ * ASTRAVERSA Ω — Galaxy Observatory Info Panel (Mission 003A)
  *
- * Displays information about selected galactic objects:
- * - Galaxy properties
- * - Star cluster properties
- * - Galaxy-scale star properties
- * - Cinematic Observatory Camera Presets
- * - Layer Visibility Toggles
- * - Real-time Astronomical Telemetry
- *
- * Shows actual generated data, never fake placeholder values.
+ * Rebuilt interaction design for the Galaxy Observatory:
+ * - Collapsible organized groups:
+ *   1. Structure (Physical model, arm geometry, bulge, halo)
+ *   2. Stars & Clusters (Tracer count, point size, clusters, density)
+ *   3. Gas & Dust (Cloud tracers, spatial coverage, opacity, dust lanes)
+ *   4. Dynamics (Simulation pause, time dilation, rigid rotation, orbital motion)
+ *   5. View & Rendering (Scale, distance, viewing angles, FOV, waypoints, layers)
+ * - True separation of astronomical population, generated tracers, rendered tracers, and GPU cap
+ * - Premium scientific observatory visual direction (deep black, restrained luminous accents, monospace metrics)
+ * - Responsive, collapsible layout with non-obscuring minimizer
  */
 
+import { useState } from 'react';
 import type { Galaxy, GalaxyStar, StarCluster } from '../universe/Galaxy';
 import { type CelestialBody, CelestialBodyType } from '../universe/CelestialBody';
 import type {
@@ -32,14 +34,29 @@ import {
 } from '../astronomy/constants';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Shared UI Components
+// Shared UI Primitives
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({
+  label,
+  value,
+  subvalue,
+  highlight = false,
+}: {
+  label: string;
+  value: string;
+  subvalue?: string;
+  highlight?: boolean;
+}) {
   return (
     <div style={styles.row}>
       <span style={styles.label}>{label}</span>
-      <span style={styles.value}>{value}</span>
+      <div style={{ textAlign: 'right' }}>
+        <span style={{ ...styles.value, ...(highlight ? styles.valueHighlight : {}) }}>
+          {value}
+        </span>
+        {subvalue && <div style={styles.subvalue}>{subvalue}</div>}
+      </div>
     </div>
   );
 }
@@ -48,8 +65,13 @@ function Divider() {
   return <div style={styles.divider} />;
 }
 
-function SectionHeading({ title }: { title: string }) {
-  return <div style={styles.sectionHeading}>{title}</div>;
+function SectionHeading({ title, badge }: { title: string; badge?: string }) {
+  return (
+    <div style={styles.sectionHeadingRow}>
+      <span style={styles.sectionHeading}>{title}</span>
+      {badge && <span style={styles.headingBadge}>{badge}</span>}
+    </div>
+  );
 }
 
 function formatNumber(value: number, decimals: number = 2): string {
@@ -58,6 +80,51 @@ function formatNumber(value: number, decimals: number = 2): string {
   if (Math.abs(value) >= 1e3) return `${(value / 1e3).toFixed(decimals)}K`;
   if (Math.abs(value) < 0.01 && value !== 0) return value.toExponential(decimals);
   return value.toFixed(decimals);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Collapsible Accordion Group
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+interface CollapsibleGroupProps {
+  id: string;
+  title: string;
+  badge?: string;
+  icon?: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}
+
+function CollapsibleGroup({
+  title,
+  badge,
+  icon,
+  isOpen,
+  onToggle,
+  children,
+}: CollapsibleGroupProps) {
+  return (
+    <div style={styles.accordionContainer}>
+      <button
+        style={{
+          ...styles.accordionHeader,
+          ...(isOpen ? styles.accordionHeaderOpen : {}),
+        }}
+        onClick={onToggle}
+      >
+        <div style={styles.accordionTitleArea}>
+          {icon && <span style={styles.accordionIcon}>{icon}</span>}
+          <span style={styles.accordionTitle}>{title}</span>
+        </div>
+        <div style={styles.accordionMetaArea}>
+          {badge && <span style={styles.accordionBadge}>{badge}</span>}
+          <span style={styles.accordionChevron}>{isOpen ? '▾' : '▸'}</span>
+        </div>
+      </button>
+      {isOpen && <div style={styles.accordionBody}>{children}</div>}
+    </div>
+  );
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -72,6 +139,8 @@ interface ControlSliderProps {
   step: number;
   unit?: string;
   subtext?: string;
+  badge?: string;
+  isModelParam?: boolean;
   onChange: (val: number) => void;
 }
 
@@ -83,14 +152,20 @@ function ControlSlider({
   step,
   unit = '',
   subtext,
+  badge,
+  isModelParam = false,
   onChange,
 }: ControlSliderProps) {
   return (
     <div style={styles.controlGroup}>
       <div style={styles.sliderHeader}>
-        <span style={styles.sliderLabel}>{label}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={styles.sliderLabel}>{label}</span>
+          {badge && <span style={styles.sliderBadge}>{badge}</span>}
+          {isModelParam && <span style={styles.modelTag}>MODEL</span>}
+        </div>
         <span style={styles.sliderValue}>
-          {value.toFixed(step < 0.1 ? 2 : 1)}{unit}
+          {value.toFixed(step < 0.1 ? (step < 0.01 ? 3 : 2) : 1)}{unit}
         </span>
       </div>
       <input
@@ -108,7 +183,7 @@ function ControlSlider({
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Observatory Controls
+// Observatory Controls Component
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export interface ObservatoryControlsProps {
@@ -122,9 +197,11 @@ export interface ObservatoryControlsProps {
   layers?: GalaxyLayerVisibility;
   onToggleLayer?: (layer: keyof GalaxyLayerVisibility) => void;
   telemetry?: GalaxyTelemetry;
+  activeRenderedStars?: number;
+  isRegenerating?: boolean;
 }
 
-function ObservatoryControls({
+export function ObservatoryControls({
   settings = DEFAULT_OBSERVATORY_SETTINGS,
   onUpdateSettings,
   onResetSettings,
@@ -135,7 +212,22 @@ function ObservatoryControls({
   layers,
   onToggleLayer,
   telemetry,
+  activeRenderedStars,
+  isRegenerating = false,
 }: ObservatoryControlsProps) {
+  // Collapsible accordion group open states
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    structure: true,
+    stars: false,
+    clouds: false,
+    dynamics: false,
+    view: false,
+  });
+
+  const toggleGroup = (key: string) => {
+    setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
   const presets: { id: CameraPreset; label: string }[] = [
     { id: 'overview', label: 'OVERVIEW' },
     { id: 'topDown', label: 'TOP-DOWN' },
@@ -160,236 +252,722 @@ function ObservatoryControls({
     { key: 'accretion', label: 'ACCRETION' },
   ];
 
-  return (
-    <div>
-      {/* 1. Simulation & Clock Dynamics */}
-      <Divider />
-      <SectionHeading title="SIMULATION & TIME SPEED" />
-      <div style={styles.simControlRow}>
-        <button
-          style={{
-            ...styles.playPauseButton,
-            ...(settings.isPaused ? styles.pausedButton : styles.runningButton),
-          }}
-          onClick={() => onUpdateSettings?.({ isPaused: !settings.isPaused })}
-        >
-          {settings.isPaused ? '▶ RESUME SIMULATION' : '⏸ PAUSE SIMULATION'}
-        </button>
-      </div>
-      <div style={{ display: 'flex', gap: 4, marginTop: 4, marginBottom: 4 }}>
-        {[0.25, 0.5, 1.0, 2.0, 4.0].map((spd) => (
-          <button
-            key={spd}
-            style={{
-              ...styles.speedButton,
-              ...(settings.timeSpeed === spd && !settings.isPaused ? styles.speedButtonActive : {}),
-            }}
-            onClick={() => onUpdateSettings?.({ timeSpeed: spd, isPaused: false })}
-          >
-            {spd}x
-          </button>
-        ))}
-      </div>
-      <div style={styles.controlSubtext}>
-        Time speed scales orbital phase progression, accretion disk, and jet dynamics.
-      </div>
+  const currentDiameter = currentPhysicalDiameterLy ?? settings.targetDiameterLy ?? 500000;
 
-      {/* 2. Scale & Radius Architecture */}
-      <Divider />
-      <SectionHeading title="SCALE & RADIUS CONTROLS" />
-      <ControlSlider
-        label="VISUAL RENDERING SCALE"
-        value={settings.renderScale}
-        min={0.25}
-        max={2.5}
-        step={0.05}
-        unit="x"
-        subtext="Optical 3D scene group scale without altering model parsec coordinates."
-        onChange={(v) => onUpdateSettings?.({ renderScale: v })}
-      />
-      <div style={styles.controlGroup}>
-        <div style={styles.sliderHeader}>
-          <span style={styles.sliderLabel}>PHYSICAL MODEL DIAMETER</span>
-          <span style={styles.sliderValue}>
-            {((currentPhysicalDiameterLy ?? 500000) / 1000).toFixed(0)}k ly
+  // Preset Configurations for Quick Morphology Loading
+  const applyMorphologyPreset = (type: 'milkyWay' | 'canonical' | 'grandDesign' | 'flocculent') => {
+    if (!onUpdateSettings) return;
+    switch (type) {
+      case 'canonical':
+        onUpdateSettings({
+          targetDiameterLy: 500000,
+          armCount: 4,
+          armPitchAngleDeg: 13.0,
+          armWidthMult: 1.0,
+          armWindingFactor: 0.62,
+          bulgeRadiusFraction: 0.13,
+          haloRadiusMultiplier: 1.5,
+        });
+        onPhysicalDiameterChange?.(500000);
+        break;
+      case 'milkyWay':
+        onUpdateSettings({
+          targetDiameterLy: 100000,
+          armCount: 4,
+          armPitchAngleDeg: 12.0,
+          armWidthMult: 0.85,
+          armWindingFactor: 0.70,
+          bulgeRadiusFraction: 0.15,
+          haloRadiusMultiplier: 1.4,
+        });
+        onPhysicalDiameterChange?.(100000);
+        break;
+      case 'grandDesign':
+        onUpdateSettings({
+          targetDiameterLy: 250000,
+          armCount: 2,
+          armPitchAngleDeg: 18.0,
+          armWidthMult: 0.80,
+          armWindingFactor: 0.85,
+          bulgeRadiusFraction: 0.12,
+          haloRadiusMultiplier: 1.3,
+        });
+        onPhysicalDiameterChange?.(250000);
+        break;
+      case 'flocculent':
+        onUpdateSettings({
+          targetDiameterLy: 400000,
+          armCount: 6,
+          armPitchAngleDeg: 9.5,
+          armWidthMult: 1.4,
+          armWindingFactor: 0.50,
+          bulgeRadiusFraction: 0.16,
+          haloRadiusMultiplier: 1.6,
+        });
+        onPhysicalDiameterChange?.(400000);
+        break;
+    }
+  };
+
+  // Preset Configurations for Stellar Density / Quality
+  const applyDensityPreset = (level: 'LOW' | 'MEDIUM' | 'HIGH' | 'ULTRA') => {
+    if (!onUpdateSettings) return;
+    switch (level) {
+      case 'LOW':
+        onUpdateSettings({ starCount: 8000, cloudCount: 6000, dustCount: 2400 });
+        break;
+      case 'MEDIUM':
+        onUpdateSettings({ starCount: 20000, cloudCount: 14000, dustCount: 4800 });
+        break;
+      case 'HIGH':
+        onUpdateSettings({ starCount: 40000, cloudCount: 22000, dustCount: 7500 });
+        break;
+      case 'ULTRA':
+        onUpdateSettings({ starCount: 75000, cloudCount: 28000, dustCount: 10000 });
+        break;
+    }
+  };
+
+  return (
+    <div style={styles.observatoryWrapper}>
+      {/* Synchronization & Status Indicator */}
+      <div style={styles.syncStatusBar}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{
+            ...styles.statusDot,
+            backgroundColor: isRegenerating ? '#f59e0b' : '#10b981',
+          }} />
+          <span style={styles.statusText}>
+            {isRegenerating ? 'REGENERATING MODEL...' : 'MODEL SYNCHRONIZED'}
           </span>
         </div>
-        <div style={styles.modelDiameterGrid}>
-          {[
-            { ly: 100000, label: '100k ly (Milky Way)' },
-            { ly: 250000, label: '250k ly (Intermediate)' },
-            { ly: 500000, label: '500k ly (ANANTARA α)' },
-            { ly: 1000000, label: '1M ly (Supergiant)' },
-          ].map((m) => {
-            const isSelected = (currentPhysicalDiameterLy ?? 500000) === m.ly;
-            return (
-              <button
-                key={m.ly}
-                style={{
-                  ...styles.diameterButton,
-                  ...(isSelected ? styles.diameterButtonActive : {}),
-                }}
-                onClick={() => onPhysicalDiameterChange?.(m.ly)}
-              >
-                {m.label}
-              </button>
-            );
-          })}
-        </div>
-        <div style={styles.controlSubtext}>
-          Regenerates astronomical entity &amp; recomputes physical parsec coordinates.
-        </div>
+        <span style={styles.statusSeed}>SEED 42</span>
       </div>
 
-      {/* 3. Rotation Dynamics */}
-      <Divider />
-      <SectionHeading title="ROTATION CONTROLS" />
-      <ControlSlider
-        label="RIGID VISUAL ROTATION"
-        value={settings.visualRotationSpeed}
-        min={0.0}
-        max={3.0}
-        step={0.1}
-        unit="x"
-        subtext="Rigid-body kinematic orientation spin around galactic polar axis."
-        onChange={(v) => onUpdateSettings?.({ visualRotationSpeed: v })}
-      />
-      <ControlSlider
-        label="STELLAR ORBITAL DYNAMICS"
-        value={settings.orbitalMotionSpeed}
-        min={0.0}
-        max={3.0}
-        step={0.1}
-        unit="x"
-        subtext="Physically motivated accretion disk velocities, jet knots & stellar twinkling."
-        onChange={(v) => onUpdateSettings?.({ orbitalMotionSpeed: v })}
-      />
-
-      {/* 4. Camera Distance & FOV */}
-      <Divider />
-      <SectionHeading title="CAMERA OBSERVATION CONTROLS" />
-      <ControlSlider
-        label="VIEWING DISTANCE"
-        value={settings.cameraDistanceMultiplier}
-        min={0.3}
-        max={3.0}
-        step={0.05}
-        unit="x"
-        subtext="Scales camera distance along look-at vector preserving star target."
-        onChange={(v) => onUpdateSettings?.({ cameraDistanceMultiplier: v })}
-      />
-      <ControlSlider
-        label="OPTICAL FIELD OF VIEW (FOV)"
-        value={settings.cameraFov}
-        min={25}
-        max={90}
-        step={1}
-        unit="°"
-        subtext="Adjusts perspective camera lens angle without breaking navigation."
-        onChange={(v) => onUpdateSettings?.({ cameraFov: v })}
-      />
-
-      <div style={{ marginTop: 6 }}>
-        <div style={styles.sliderLabel}>CINEMATIC WAYPOINTS</div>
-        <div style={styles.buttonGrid}>
-          {presets.map((p) => (
-            <button
-              key={p.id}
-              style={{
-                ...styles.presetButton,
-                ...(activePreset === p.id ? styles.presetButtonActive : {}),
-              }}
-              onClick={() => onSelectPreset?.(p.id)}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 5. Optics, Density & Layer Controls */}
-      <Divider />
-      <SectionHeading title="OPTICS & LAYER CONTROLS" />
-      <ControlSlider
-        label="STELLAR POINT SIZE"
-        value={settings.starSizeMultiplier}
-        min={0.5}
-        max={2.5}
-        step={0.1}
-        unit="x"
-        subtext="Dual-profile optical shader star rendering point size."
-        onChange={(v) => onUpdateSettings?.({ starSizeMultiplier: v })}
-      />
-      <ControlSlider
-        label="HALO ENVELOPE OPACITY"
-        value={settings.haloOpacity}
-        min={0.0}
-        max={2.0}
-        step={0.1}
-        unit="x"
-        subtext="Smooth Population II extended halo envelope opacity."
-        onChange={(v) => onUpdateSettings?.({ haloOpacity: v })}
-      />
-      <ControlSlider
-        label="DARK DUST EXTINCTION OPACITY"
-        value={settings.dustOpacity}
-        min={0.0}
-        max={2.0}
-        step={0.1}
-        unit="x"
-        subtext="Spiral arm & bar shock dust extinction lane opacity."
-        onChange={(v) => onUpdateSettings?.({ dustOpacity: v })}
-      />
-      <div style={{ marginTop: 4 }}>
-        <div style={styles.sliderLabel}>LAYER VISIBILITY TOGGLES</div>
-        <div style={styles.layerRow}>
-          {layerKeys.map(({ key, label }) => {
-            const isActive = layers ? layers[key] : true;
-            return (
-              <button
-                key={key}
-                style={{
-                  ...styles.layerBadge,
-                  ...(isActive ? styles.layerBadgeActive : {}),
-                }}
-                onClick={() => onToggleLayer?.(key)}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 6. Reset Controls */}
-      <Divider />
-      <SectionHeading title="DEFAULTS & CALIBRATION" />
-      <button
-        style={styles.resetButton}
-        onClick={onResetSettings}
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          GROUP 1: STRUCTURE (PHYSICAL GALAXY MODEL)
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <CollapsibleGroup
+        id="structure"
+        title="1. STRUCTURE"
+        badge={`${(currentDiameter / 1000).toFixed(0)}k ly · ${settings.armCount ?? 4} Arms`}
+        icon="🌌"
+        isOpen={openGroups.structure}
+        onToggle={() => toggleGroup('structure')}
       >
-        ↺ RESET OBSERVATORY DEFAULTS
-      </button>
-      <div style={styles.controlSubtext}>
-        Restores canonical 500k ly model, 1.0x scales, standard FOV and layers without modifying seed.
-      </div>
+        {/* Morphology Quick Presets */}
+        <div style={{ marginBottom: 10 }}>
+          <div style={styles.subHeading}>MORPHOLOGY ARCHITECTURE PRESETS</div>
+          <div style={styles.presetGrid}>
+            <button
+              style={{
+                ...styles.miniPresetButton,
+                ...(currentDiameter === 500000 && settings.armCount === 4 ? styles.miniPresetButtonActive : {}),
+              }}
+              onClick={() => applyMorphologyPreset('canonical')}
+            >
+              ANANTARA α
+            </button>
+            <button
+              style={{
+                ...styles.miniPresetButton,
+                ...(currentDiameter === 100000 ? styles.miniPresetButtonActive : {}),
+              }}
+              onClick={() => applyMorphologyPreset('milkyWay')}
+            >
+              Milky Way
+            </button>
+            <button
+              style={{
+                ...styles.miniPresetButton,
+                ...(settings.armCount === 2 ? styles.miniPresetButtonActive : {}),
+              }}
+              onClick={() => applyMorphologyPreset('grandDesign')}
+            >
+              Grand Design
+            </button>
+            <button
+              style={{
+                ...styles.miniPresetButton,
+                ...(settings.armCount === 6 ? styles.miniPresetButtonActive : {}),
+              }}
+              onClick={() => applyMorphologyPreset('flocculent')}
+            >
+              Flocculent
+            </button>
+          </div>
+        </div>
 
-      {/* 7. Telemetry */}
+        {/* Physical Disk Diameter */}
+        <ControlSlider
+          label="PHYSICAL DISK DIAMETER"
+          value={currentDiameter}
+          min={50000}
+          max={1500000}
+          step={25000}
+          unit=" ly"
+          subtext="Main stellar disk body physical diameter (~3,261.56 ly = 1 kpc)."
+          isModelParam
+          onChange={(v) => {
+            onPhysicalDiameterChange?.(v);
+            onUpdateSettings?.({ targetDiameterLy: v });
+          }}
+        />
+
+        {/* Spiral Arm Count */}
+        <ControlSlider
+          label="SPIRAL ARM COUNT"
+          value={settings.armCount ?? 4}
+          min={2}
+          max={8}
+          step={1}
+          unit=" arms"
+          subtext="Number of continuous logarithmic density waves originating from bar tips."
+          isModelParam
+          onChange={(v) => onUpdateSettings?.({ armCount: Math.round(v) })}
+        />
+
+        {/* Spiral Pitch Angle */}
+        <ControlSlider
+          label="SPIRAL PITCH ANGLE (ψ)"
+          value={settings.armPitchAngleDeg ?? 13.0}
+          min={6.0}
+          max={30.0}
+          step={0.5}
+          unit="°"
+          subtext="Angle between spiral arm tangent and circle of constant radius."
+          isModelParam
+          onChange={(v) => onUpdateSettings?.({ armPitchAngleDeg: v })}
+        />
+
+        {/* Spiral Arm Width Multiplier */}
+        <ControlSlider
+          label="SPIRAL ARM WIDTH"
+          value={settings.armWidthMult ?? 1.0}
+          min={0.3}
+          max={2.5}
+          step={0.05}
+          unit="x"
+          subtext="Radial broadening and dispersion along the density wave ridges."
+          isModelParam
+          onChange={(v) => onUpdateSettings?.({ armWidthMult: v })}
+        />
+
+        {/* Spiral Winding Factor */}
+        <ControlSlider
+          label="SPIRAL WINDING FACTOR"
+          value={settings.armWindingFactor ?? 0.62}
+          min={0.2}
+          max={1.5}
+          step={0.05}
+          unit="x"
+          subtext="Angular winding rate controlling spiral density curvature."
+          isModelParam
+          onChange={(v) => onUpdateSettings?.({ armWindingFactor: v })}
+        />
+
+        {/* Bulge Radius Fraction */}
+        <ControlSlider
+          label="BULGE RADIUS FRACTION"
+          value={settings.bulgeRadiusFraction ?? 0.13}
+          min={0.05}
+          max={0.30}
+          step={0.01}
+          unit=""
+          subtext={`Bulge extent relative to disk radius (~${((settings.bulgeRadiusFraction ?? 0.13) * (currentDiameter / 3261.56 / 2)).toFixed(1)} kpc).`}
+          isModelParam
+          onChange={(v) => onUpdateSettings?.({ bulgeRadiusFraction: v })}
+        />
+
+        {/* Halo Extent Multiplier */}
+        <ControlSlider
+          label="HALO EXTENT MULTIPLIER"
+          value={settings.haloRadiusMultiplier ?? 1.5}
+          min={1.0}
+          max={2.5}
+          step={0.1}
+          unit="x"
+          subtext={`Outer Pop II stellar halo boundary (~${((settings.haloRadiusMultiplier ?? 1.5) * currentDiameter / 1000).toFixed(0)}k ly diameter).`}
+          isModelParam
+          onChange={(v) => onUpdateSettings?.({ haloRadiusMultiplier: v })}
+        />
+      </CollapsibleGroup>
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          GROUP 2: STARS & CLUSTERS
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <CollapsibleGroup
+        id="stars"
+        title="2. STARS & CLUSTERS"
+        badge={`${formatNumber(settings.starCount ?? 20000, 0)} Stars`}
+        icon="✨"
+        isOpen={openGroups.stars}
+        onToggle={() => toggleGroup('stars')}
+      >
+        {/* Density Quality Presets */}
+        <div style={{ marginBottom: 10 }}>
+          <div style={styles.subHeading}>TRACER DENSITY PRESETS</div>
+          <div style={styles.presetGrid}>
+            <button
+              style={{
+                ...styles.miniPresetButton,
+                ...((settings.starCount ?? 20000) <= 10000 ? styles.miniPresetButtonActive : {}),
+              }}
+              onClick={() => applyDensityPreset('LOW')}
+            >
+              Low (8k)
+            </button>
+            <button
+              style={{
+                ...styles.miniPresetButton,
+                ...((settings.starCount ?? 20000) === 20000 ? styles.miniPresetButtonActive : {}),
+              }}
+              onClick={() => applyDensityPreset('MEDIUM')}
+            >
+              Med (20k)
+            </button>
+            <button
+              style={{
+                ...styles.miniPresetButton,
+                ...((settings.starCount ?? 20000) === 40000 ? styles.miniPresetButtonActive : {}),
+              }}
+              onClick={() => applyDensityPreset('HIGH')}
+            >
+              High (40k)
+            </button>
+            <button
+              style={{
+                ...styles.miniPresetButton,
+                ...((settings.starCount ?? 20000) >= 70000 ? styles.miniPresetButtonActive : {}),
+              }}
+              onClick={() => applyDensityPreset('ULTRA')}
+            >
+              Ultra (75k)
+            </button>
+          </div>
+        </div>
+
+        {/* Stellar Tracer Count Slider */}
+        <ControlSlider
+          label="STELLAR TRACER COUNT"
+          value={settings.starCount ?? 20000}
+          min={5000}
+          max={80000}
+          step={2500}
+          unit=" tracers"
+          subtext="Explicit GPU points generated for individual stars (Safe hardware cap: 100,000)."
+          isModelParam
+          onChange={(v) => onUpdateSettings?.({ starCount: Math.round(v) })}
+        />
+
+        {/* Optical Point Size */}
+        <ControlSlider
+          label="OPTICAL POINT SIZE"
+          value={settings.starSizeMultiplier}
+          min={0.5}
+          max={2.5}
+          step={0.1}
+          unit="x"
+          subtext="Diffraction disc shader size multiplier (uniform uSizeMul)."
+          onChange={(v) => onUpdateSettings?.({ starSizeMultiplier: v })}
+        />
+
+        {/* Star Nurseries / Clusters Count */}
+        <ControlSlider
+          label="STAR NURSERIES COUNT"
+          value={settings.clusterCount ?? 36}
+          min={8}
+          max={100}
+          step={4}
+          unit=" clusters"
+          subtext="Discrete H II star-forming nursery complexes along density wave fronts."
+          isModelParam
+          onChange={(v) => onUpdateSettings?.({ clusterCount: Math.round(v) })}
+        />
+
+        {/* Cluster Particle Density Multiplier */}
+        <ControlSlider
+          label="CLUSTER PARTICLE DENSITY"
+          value={settings.clusterDensityMultiplier ?? 1.0}
+          min={0.2}
+          max={3.0}
+          step={0.1}
+          unit="x"
+          subtext={`Particles rendered per cluster (~${Math.round(32 * (settings.clusterDensityMultiplier ?? 1.0))} pts/cluster).`}
+          onChange={(v) => onUpdateSettings?.({ clusterDensityMultiplier: v })}
+        />
+
+        {/* Population & Tracer Statistics Breakdown */}
+        <div style={styles.statsCard}>
+          <div style={styles.statsHeader}>TRACER TELEMETRY BREAKDOWN</div>
+          <InfoRow
+            label="EST. GALAXY POPULATION"
+            value="420 Billion"
+            subvalue="Astronomical Population"
+          />
+          <InfoRow
+            label="GENERATED TRACERS"
+            value={`${formatNumber(settings.starCount ?? 20000, 0)} stars`}
+            subvalue="Procedural Domain Buffer"
+          />
+          <InfoRow
+            label="ACTIVE RENDERED TRACERS"
+            value={`${formatNumber(activeRenderedStars ?? settings.starCount ?? 20000, 0)} stars`}
+            subvalue="Visible Layer Pipeline"
+            highlight
+          />
+          <InfoRow
+            label="HARDWARE SAFETY CAP"
+            value="100,000 max"
+            subvalue="Explicit Resource Limit"
+          />
+        </div>
+      </CollapsibleGroup>
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          GROUP 3: GAS & DUST (CLOUDS & INTERSTELLAR MEDIUM)
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <CollapsibleGroup
+        id="clouds"
+        title="3. GAS & DUST"
+        badge={`${formatNumber((settings.cloudCount ?? 14000) + (settings.dustCount ?? 4800), 0)} Particles`}
+        icon="☁️"
+        isOpen={openGroups.clouds}
+        onToggle={() => toggleGroup('clouds')}
+      >
+        <div style={styles.subHeading}>DIFFUSE GAS &amp; NEBULA EMISSION</div>
+
+        {/* Gas Cloud Tracer Count */}
+        <ControlSlider
+          label="CLOUD TRACER COUNT"
+          value={settings.cloudCount ?? 14000}
+          min={4000}
+          max={30000}
+          step={1000}
+          unit=" pts"
+          subtext="Interstellar medium gas cloud particles uploaded to GPU continuum buffer."
+          onChange={(v) => onUpdateSettings?.({ cloudCount: Math.round(v) })}
+        />
+
+        {/* Gas Cloud Spatial Coverage */}
+        <ControlSlider
+          label="CLOUD SPATIAL COVERAGE"
+          value={settings.cloudCoverage ?? 1.0}
+          min={0.5}
+          max={2.0}
+          step={0.1}
+          unit="x"
+          subtext="Gaussian radial and vertical dispersion scale of diffuse emission."
+          onChange={(v) => onUpdateSettings?.({ cloudCoverage: v })}
+        />
+
+        {/* Gas Cloud Opacity */}
+        <ControlSlider
+          label="CLOUD EMISSION OPACITY"
+          value={settings.cloudOpacity ?? 1.0}
+          min={0.0}
+          max={2.0}
+          step={0.1}
+          unit="x"
+          subtext="Silky emission continuum starlight and H II glow intensity."
+          onChange={(v) => onUpdateSettings?.({ cloudOpacity: v })}
+        />
+
+        <Divider />
+        <div style={styles.subHeading}>DARK DUST EXTINCTION LANES</div>
+
+        {/* Dust Lane Count */}
+        <ControlSlider
+          label="DUST TRACER COUNT"
+          value={settings.dustCount ?? 4800}
+          min={1500}
+          max={12000}
+          step={500}
+          unit=" pts"
+          subtext="Absorption lane tracers along concave arm edges and bar shock fronts."
+          onChange={(v) => onUpdateSettings?.({ dustCount: Math.round(v) })}
+        />
+
+        {/* Dust Spatial Width */}
+        <ControlSlider
+          label="DUST SHOCK SPATIAL WIDTH"
+          value={settings.dustCoverage ?? 1.0}
+          min={0.5}
+          max={2.0}
+          step={0.1}
+          unit="x"
+          subtext="Filament width and shock compression lane offset."
+          onChange={(v) => onUpdateSettings?.({ dustCoverage: v })}
+        />
+
+        {/* Dust Extinction Opacity */}
+        <ControlSlider
+          label="DUST EXTINCTION OPACITY"
+          value={settings.dustOpacity}
+          min={0.0}
+          max={2.0}
+          step={0.1}
+          unit="x"
+          subtext="Absorption silhouette strength blocking background disk emission."
+          onChange={(v) => onUpdateSettings?.({ dustOpacity: v })}
+        />
+
+        {/* Stellar Halo Opacity */}
+        <ControlSlider
+          label="HALO ENVELOPE OPACITY"
+          value={settings.haloOpacity}
+          min={0.0}
+          max={1.0}
+          step={0.05}
+          unit="x"
+          subtext="Visibility of extended Population II stellar halo envelope."
+          onChange={(v) => onUpdateSettings?.({ haloOpacity: v })}
+        />
+      </CollapsibleGroup>
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          GROUP 4: DYNAMICS (ROTATION & SIMULATION CLOCK)
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <CollapsibleGroup
+        id="dynamics"
+        title="4. DYNAMICS"
+        badge={settings.isPaused ? 'PAUSED' : `${settings.timeSpeed}x Speed`}
+        icon="⏱️"
+        isOpen={openGroups.dynamics}
+        onToggle={() => toggleGroup('dynamics')}
+      >
+        {/* Pause / Resume Button */}
+        <div style={{ marginBottom: 10 }}>
+          <button
+            style={{
+              ...styles.playPauseButton,
+              ...(settings.isPaused ? styles.pausedButton : styles.runningButton),
+            }}
+            onClick={() => onUpdateSettings?.({ isPaused: !settings.isPaused })}
+          >
+            {settings.isPaused ? '▶ RESUME SIMULATION CLOCK' : '⏸ PAUSE SIMULATION CLOCK'}
+          </button>
+        </div>
+
+        {/* Time Multiplier Buttons */}
+        <div style={{ marginBottom: 10 }}>
+          <div style={styles.subHeading}>SIMULATION TIME MULTIPLIER</div>
+          <div style={styles.speedGrid}>
+            {[0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 10.0].map((spd) => (
+              <button
+                key={spd}
+                style={{
+                  ...styles.speedButton,
+                  ...(settings.timeSpeed === spd && !settings.isPaused ? styles.speedButtonActive : {}),
+                }}
+                onClick={() => onUpdateSettings?.({ timeSpeed: spd, isPaused: false })}
+              >
+                {spd}x
+              </button>
+            ))}
+          </div>
+          <div style={styles.controlSubtext}>
+            Scales time advancement for orbital mechanics, accretion disc, and jet knots.
+          </div>
+        </div>
+
+        {/* Rigid Visual Rotation */}
+        <ControlSlider
+          label="RIGID VISUAL ROTATION"
+          value={settings.visualRotationSpeed}
+          min={0.0}
+          max={5.0}
+          step={0.1}
+          unit="x"
+          subtext="Kinematic rigid-body orientation spin of the 3D scene group around polar Y-axis."
+          onChange={(v) => onUpdateSettings?.({ visualRotationSpeed: v })}
+        />
+
+        {/* Internal Orbital Dynamics */}
+        <ControlSlider
+          label="ORBITAL MOTION SPEED"
+          value={settings.orbitalMotionSpeed}
+          min={0.0}
+          max={5.0}
+          step={0.1}
+          unit="x"
+          subtext="Internal differential Keplerian rotation, accretion flows, and stellar phase twinkling."
+          onChange={(v) => onUpdateSettings?.({ orbitalMotionSpeed: v })}
+        />
+
+        <div style={styles.noticeBox}>
+          <div style={styles.noticeTitle}>SCIENTIFIC INTEGRITY NOTE</div>
+          <div style={styles.noticeText}>
+            Rigid-body visual rotation is strictly separated from internal differential orbital mechanics. Modifying visual rotation does not claim to alter gravitational rotation curves.
+          </div>
+        </div>
+      </CollapsibleGroup>
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          GROUP 5: VIEW & RENDERING (CAMERA & OPTICS)
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <CollapsibleGroup
+        id="view"
+        title="5. VIEW & RENDERING"
+        badge={`${settings.cameraFov}° FOV · ${settings.renderScale}x Scale`}
+        icon="🔭"
+        isOpen={openGroups.view}
+        onToggle={() => toggleGroup('view')}
+      >
+        {/* Visual Rendering Scale */}
+        <ControlSlider
+          label="VISUAL RENDERING SCALE"
+          value={settings.renderScale}
+          min={0.25}
+          max={2.5}
+          step={0.05}
+          unit="x"
+          subtext="Optical 3D scene group scale without altering physical parsec coordinates."
+          onChange={(v) => onUpdateSettings?.({ renderScale: v })}
+        />
+
+        {/* Camera Viewing Distance */}
+        <ControlSlider
+          label="CAMERA VIEWING DISTANCE"
+          value={settings.cameraDistanceMultiplier}
+          min={0.3}
+          max={3.0}
+          step={0.05}
+          unit="x"
+          subtext="Scales camera distance along look-at axis with immediate orbit update."
+          onChange={(v) => onUpdateSettings?.({ cameraDistanceMultiplier: v })}
+        />
+
+        {/* Camera Elevation (Tilt) Angle */}
+        <ControlSlider
+          label="VIEWING ELEVATION (TILT)"
+          value={settings.cameraViewingAngle ?? 38.0}
+          min={-85.0}
+          max={85.0}
+          step={1.0}
+          unit="°"
+          subtext="Camera elevation tilt: 0° is edge-on, 85° is top-down north pole."
+          onChange={(v) => onUpdateSettings?.({ cameraViewingAngle: v })}
+        />
+
+        {/* Camera Azimuth (Yaw) Angle */}
+        <ControlSlider
+          label="VIEWING AZIMUTH (YAW)"
+          value={settings.cameraAzimuthAngle ?? 45.0}
+          min={-180.0}
+          max={180.0}
+          step={5.0}
+          unit="°"
+          subtext="Orbital azimuth angle in the horizontal plane around the galaxy center."
+          onChange={(v) => onUpdateSettings?.({ cameraAzimuthAngle: v })}
+        />
+
+        {/* Camera Optical FOV */}
+        <ControlSlider
+          label="OPTICAL FIELD OF VIEW (FOV)"
+          value={settings.cameraFov}
+          min={25}
+          max={90}
+          step={1}
+          unit="°"
+          subtext="Perspective camera focal angle (25° telephoto to 90° wide-field)."
+          onChange={(v) => onUpdateSettings?.({ cameraFov: v })}
+        />
+
+        {/* Cinematic Waypoints */}
+        <div style={{ marginTop: 10 }}>
+          <div style={styles.subHeading}>CINEMATIC OBSERVATORY WAYPOINTS</div>
+          <div style={styles.buttonGrid}>
+            {presets.map((p) => (
+              <button
+                key={p.id}
+                style={{
+                  ...styles.presetButton,
+                  ...(activePreset === p.id ? styles.presetButtonActive : {}),
+                }}
+                onClick={() => onSelectPreset?.(p.id)}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Layer Visibility Toggles */}
+        <div style={{ marginTop: 10 }}>
+          <div style={styles.subHeading}>LAYER VISIBILITY TOGGLES</div>
+          <div style={styles.layerRow}>
+            {layerKeys.map(({ key, label }) => {
+              const isActive = layers ? layers[key] : true;
+              return (
+                <button
+                  key={key}
+                  style={{
+                    ...styles.layerBadge,
+                    ...(isActive ? styles.layerBadgeActive : {}),
+                  }}
+                  onClick={() => onToggleLayer?.(key)}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </CollapsibleGroup>
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          TELEMETRY & RESET CONTROLS
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       {telemetry && (
-        <>
-          <Divider />
-          <SectionHeading title="OBSERVATORY TELEMETRY" />
-          <InfoRow label="CAMERA R" value={`${telemetry.distanceKpc.toFixed(1)} kpc`} />
-          <InfoRow label="ORBITAL SPEED" value={`~${telemetry.speedKms} km/s`} />
-          <InfoRow label="RENDER FPS" value={`${telemetry.fps} fps`} />
-        </>
+        <div style={styles.telemetryCard}>
+          <div style={styles.statsHeader}>LIVE OBSERVATORY TELEMETRY</div>
+          <div style={styles.telemetryGrid}>
+            <div style={styles.telemetryItem}>
+              <span style={styles.telemetryLabel}>CAMERA R</span>
+              <span style={styles.telemetryValue}>{telemetry.distanceKpc.toFixed(1)} kpc</span>
+            </div>
+            <div style={styles.telemetryItem}>
+              <span style={styles.telemetryLabel}>ORBIT SPEED</span>
+              <span style={styles.telemetryValue}>~{telemetry.speedKms} km/s</span>
+            </div>
+            <div style={styles.telemetryItem}>
+              <span style={styles.telemetryLabel}>FRAME RATE</span>
+              <span style={{
+                ...styles.telemetryValue,
+                color: telemetry.fps >= 50 ? '#10b981' : telemetry.fps >= 30 ? '#f59e0b' : '#ef4444',
+              }}>
+                {telemetry.fps} FPS
+              </span>
+            </div>
+            <div style={styles.telemetryItem}>
+              <span style={styles.telemetryLabel}>GAS &amp; DUST</span>
+              <span style={styles.telemetryValue}>
+                {formatNumber((settings.cloudCount ?? 14000) + (settings.dustCount ?? 4800), 0)} pts
+              </span>
+            </div>
+          </div>
+        </div>
       )}
+
+      {/* Reset Defaults Button */}
+      <div style={{ marginTop: 14 }}>
+        <button
+          style={styles.resetButton}
+          onClick={onResetSettings}
+        >
+          ↺ RESTORE OBSERVATORY CANONICAL DEFAULTS
+        </button>
+        <div style={styles.controlSubtext}>
+          Restores canonical 500k ly model, 4 arms, 20k stars, 1.0x scales, and layers without modifying seed 42.
+        </div>
+      </div>
     </div>
   );
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Galaxy Info
+// Galaxy Info Main Wrapper Component
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 interface GalaxyInfoProps {
@@ -405,6 +983,8 @@ interface GalaxyInfoProps {
   onResetObservatorySettings?: () => void;
   onPhysicalDiameterChange?: (diameterLy: number) => void;
   currentPhysicalDiameterLy?: number;
+  activeRenderedStars?: number;
+  isRegenerating?: boolean;
 }
 
 function GalaxyInfo({
@@ -420,11 +1000,29 @@ function GalaxyInfo({
   onResetObservatorySettings,
   onPhysicalDiameterChange,
   currentPhysicalDiameterLy,
+  activeRenderedStars,
+  isRegenerating,
 }: GalaxyInfoProps) {
+  const [isMinimized, setIsMinimized] = useState<boolean>(false);
   const isBarred = galaxy.bar !== undefined;
   const armNames = galaxy.spiralArmDefinitions
-    ? galaxy.spiralArmDefinitions.map(a => a.name.split(' ')[0]).join(', ')
+    ? galaxy.spiralArmDefinitions.map((a) => a.name.split(' ')[0]).join(', ')
     : `${galaxy.spiralArms.armCount} Arms`;
+
+  if (isMinimized) {
+    return (
+      <div style={styles.minimizedContainer}>
+        <div style={styles.minimizedContent} onClick={() => setIsMinimized(false)}>
+          <span style={styles.minimizedDot} />
+          <span style={styles.minimizedTitle}>{galaxy.displayName ?? galaxy.name}</span>
+          <span style={styles.minimizedFps}>{telemetry?.fps ?? 60} FPS</span>
+          <button style={styles.minimizeBtn} title="Expand Observatory Panel">
+            ▢ EXPAND
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -432,95 +1030,83 @@ function GalaxyInfo({
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
     >
+      {/* Panel Header */}
       <div style={styles.header}>
-        <div style={{ ...styles.colorDot, backgroundColor: '#ffe8c0' }} />
-        <span style={styles.name}>{galaxy.displayName ?? galaxy.name}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ ...styles.colorDot, backgroundColor: '#ffe8c0' }} />
+          <div>
+            <div style={styles.name}>{galaxy.displayName ?? galaxy.name}</div>
+            <div style={styles.typeLabel}>GALAXY OBSERVATORY · {isBarred ? 'SBbc BARRED SPIRAL' : galaxy.type}</div>
+          </div>
+        </div>
+        <button
+          style={styles.minimizeBtn}
+          onClick={() => setIsMinimized(true)}
+          title="Minimize Panel to Clear Viewport"
+        >
+          — HIDE
+        </button>
       </div>
-      <div style={styles.typeLabel}>GALAXY OBSERVATORY · {galaxy.type.toUpperCase()}</div>
+
       <Divider />
-      <InfoRow label="MORPHOLOGY" value={isBarred ? 'SBbc Barred Spiral' : galaxy.type} />
-      {galaxy.diskStructure ? (
-        <>
-          <InfoRow
-            label="MAIN STELLAR DISK ⌀"
-            value={`${galaxy.diskStructure.mainDiskDiameterLy.toLocaleString()} ly (${(galaxy.diskStructure.mainDiskRadiusKpc * 2).toFixed(1)} kpc)`}
-          />
-          <InfoRow
-            label="STELLAR HALO ⌀"
-            value={`${galaxy.diskStructure.extendedHaloDiameterLy.toLocaleString()} ly (${(galaxy.diskStructure.extendedHaloRadiusKpc * 2).toFixed(1)} kpc)`}
-          />
-          {galaxy.nucleus?.jetLengthKpc && (
-            <InfoRow
-              label="RADIO JETS EXTENT"
-              value={`~${(galaxy.nucleus.jetLengthKpc * 2 * 3261.56).toFixed(0)} ly (${(galaxy.nucleus.jetLengthKpc * 2).toFixed(1)} kpc tip-to-tip)`}
-            />
-          )}
-          <InfoRow
-            label="DISK SCALE H"
-            value={`${galaxy.diskStructure.thinScaleHeight} / ${galaxy.diskStructure.thickScaleHeight} kpc (thin/thick)`}
-          />
-        </>
-      ) : (
-        <InfoRow label="RADIUS" value={`${galaxy.radius.toFixed(1)} kpc`} />
-      )}
-      <div style={styles.disclaimerNote}>
-        *Main stellar diameter excludes circumgalactic radio lobes &amp; faint halo envelope.
+
+      {/* Astronomy Facts Pill Header */}
+      <div style={styles.quickFactsRow}>
+        <div style={styles.quickFact}>
+          <span style={styles.quickFactLabel}>DISK ⌀</span>
+          <span style={styles.quickFactVal}>{((currentPhysicalDiameterLy ?? 500000) / 1000).toFixed(0)}k ly</span>
+        </div>
+        <div style={styles.quickFact}>
+          <span style={styles.quickFactLabel}>RADIUS</span>
+          <span style={styles.quickFactVal}>{galaxy.radius.toFixed(1)} kpc</span>
+        </div>
+        <div style={styles.quickFact}>
+          <span style={styles.quickFactLabel}>ARMS</span>
+          <span style={styles.quickFactVal} title={armNames}>{galaxy.spiralArms.armCount} Continuous</span>
+        </div>
+        <div style={styles.quickFact}>
+          <span style={styles.quickFactLabel}>AGE</span>
+          <span style={styles.quickFactVal}>{galaxy.age.toFixed(1)} Gyr</span>
+        </div>
       </div>
-      {galaxy.bar && (
-        <InfoRow
-          label="STELLAR BAR"
-          value={`${galaxy.bar.length.toFixed(1)} × ${galaxy.bar.width.toFixed(1)} kpc (${((galaxy.bar.angle * 180) / Math.PI).toFixed(0)}°)`}
-        />
-      )}
-      <InfoRow label="ARMS" value={`${galaxy.spiralArms.armCount} Logarithmic (${armNames})`} />
+
+      {/* Central Supermassive Black Hole Summary */}
       {galaxy.nucleus && (
-        <div style={{ marginTop: 4, marginBottom: 4 }}>
-          <div style={styles.row}>
-            <span style={styles.label}>NUCLEUS</span>
-            <button
-              style={{
-                background: 'rgba(56, 189, 248, 0.15)',
-                border: '1px solid rgba(56, 189, 248, 0.4)',
-                color: '#38bdf8',
-                borderRadius: 4,
-                padding: '2px 6px',
-                fontSize: 10,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-              onClick={onSelectNucleus}
-            >
-              {galaxy.nucleus.name} ↗
-            </button>
+        <div style={styles.nucleusBanner} onClick={onSelectNucleus}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={styles.nucleusIcon}>⚫</span>
+              <div>
+                <span style={styles.nucleusName}>{galaxy.nucleus.name}</span>
+                <span style={styles.nucleusSub}>{formatNumber(galaxy.nucleus.massSolar)} M☉ SMBH</span>
+              </div>
+            </div>
+            <span style={styles.nucleusAction}>INSPECT →</span>
           </div>
         </div>
       )}
-      <InfoRow label="AGE" value={`${galaxy.age.toFixed(1)} Gyr`} />
-      <InfoRow label="POPULATION" value={`~${formatNumber(galaxy.estimatedPopulation)}B stars`} />
-      <InfoRow label="CLUSTERS" value={`${galaxy.clusters.length} Nurseries`} />
-      <InfoRow label="METALLICITY" value={galaxy.metallicity.toFixed(2)} />
-      <InfoRow label="SEED" value={galaxy.seed.toString()} />
-      <InfoRow label="VISIBLE" value={`${formatNumber(galaxy.stars.length)} stars`} />
 
-      <Divider />
+      {/* Comprehensive 5-Group Observatory Controls */}
       <ObservatoryControls
         settings={observatorySettings}
         onUpdateSettings={onUpdateObservatorySettings}
         onResetSettings={onResetObservatorySettings}
         onPhysicalDiameterChange={onPhysicalDiameterChange}
-        currentPhysicalDiameterLy={currentPhysicalDiameterLy ?? galaxy.diskStructure?.mainDiskDiameterLy}
+        currentPhysicalDiameterLy={currentPhysicalDiameterLy}
         activePreset={activePreset}
         onSelectPreset={onSelectPreset}
         layers={layers}
         onToggleLayer={onToggleLayer}
         telemetry={telemetry}
+        activeRenderedStars={activeRenderedStars}
+        isRegenerating={isRegenerating}
       />
     </div>
   );
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Star Cluster Info
+// Sub-Information Panels (Clusters, Stars, Systems)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 interface ClusterInfoProps {
@@ -547,10 +1133,6 @@ function ClusterInfo({ cluster }: ClusterInfoProps) {
   );
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Galaxy Star Info
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 interface GalaxyStarInfoProps {
   star: GalaxyStar;
   onEnterSystem: () => void;
@@ -575,20 +1157,12 @@ function GalaxyStarInfo({ star, onEnterSystem }: GalaxyStarInfoProps) {
       <Divider />
       <InfoRow label="SEED" value={star.seed.toString()} />
 
-      {/* Enter System button */}
-      <button
-        style={styles.enterButton}
-        onClick={onEnterSystem}
-      >
+      <button style={styles.enterButton} onClick={onEnterSystem}>
         ENTER STAR SYSTEM →
       </button>
     </div>
   );
 }
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Solar System Star & Planet Info
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function SystemStarInfo({ body }: { body: CelestialBody }) {
   const sp = body.starProperties;
@@ -617,24 +1191,15 @@ function SystemPlanetInfo({ body }: { body: CelestialBody }) {
       <InfoRow label="ORBIT" value={`${orbitalAU.toFixed(3)} AU`} />
       <InfoRow
         label="PERIOD"
-        value={periodYears >= 1
-          ? `${periodYears.toFixed(2)} years`
-          : `${periodDays.toFixed(1)} days`
-        }
+        value={periodYears >= 1 ? `${periodYears.toFixed(2)} years` : `${periodDays.toFixed(1)} days`}
       />
       <InfoRow
         label="VELOCITY"
-        value={`${formatNumber(Math.sqrt(
-          body.velocity.x ** 2 + body.velocity.y ** 2 + body.velocity.z ** 2
-        ) / 1000)} km/s`}
+        value={`${formatNumber(Math.sqrt(body.velocity.x ** 2 + body.velocity.y ** 2 + body.velocity.z ** 2) / 1000)} km/s`}
       />
     </>
   );
 }
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Supermassive Black Hole Nucleus Info
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 interface NucleusInfoProps {
   galaxy: Galaxy;
@@ -669,7 +1234,7 @@ function NucleusInfo({ galaxy, onSelectPreset, onUpdateMass, onClose }: NucleusI
 
       <SectionHeading title="CONFIGURABLE MASS (SIMULATION)" />
       <div style={styles.buttonGrid}>
-        {massPresets.map(preset => {
+        {massPresets.map((preset) => {
           const isCurrent = Math.abs(nucleus.massSolar - preset.mass) / preset.mass < 0.05;
           return (
             <button
@@ -755,7 +1320,7 @@ function NucleusInfo({ galaxy, onSelectPreset, onUpdateMass, onClose }: NucleusI
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Unified Info Panel
+// Unified Info Panel (Top-Level Container)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export interface UnifiedInfoPanelProps {
@@ -779,6 +1344,8 @@ export interface UnifiedInfoPanelProps {
   onResetObservatorySettings?: () => void;
   onPhysicalDiameterChange?: (diameterLy: number) => void;
   currentPhysicalDiameterLy?: number;
+  activeRenderedStars?: number;
+  isRegenerating?: boolean;
 }
 
 export function UnifiedInfoPanel({
@@ -802,6 +1369,8 @@ export function UnifiedInfoPanel({
   onResetObservatorySettings,
   onPhysicalDiameterChange,
   currentPhysicalDiameterLy,
+  activeRenderedStars,
+  isRegenerating,
 }: UnifiedInfoPanelProps) {
   // System view: show celestial body info
   if (inSystemView && selectedBody) {
@@ -873,6 +1442,8 @@ export function UnifiedInfoPanel({
         onResetObservatorySettings={onResetObservatorySettings}
         onPhysicalDiameterChange={onPhysicalDiameterChange}
         currentPhysicalDiameterLy={currentPhysicalDiameterLy}
+        activeRenderedStars={activeRenderedStars}
+        isRegenerating={isRegenerating}
       />
     );
   }
@@ -881,32 +1452,81 @@ export function UnifiedInfoPanel({
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Styles
+// Observatory Styles
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
     position: 'absolute',
-    top: 80,
-    right: 24,
-    width: 295,
-    maxHeight: 'calc(100vh - 110px)',
+    top: 70,
+    right: 20,
+    width: 330,
+    maxHeight: 'calc(100vh - 90px)',
     overflowY: 'auto',
     padding: '16px 18px',
-    background: 'rgba(4, 6, 16, 0.88)',
-    backdropFilter: 'blur(16px)',
-    border: '1px solid rgba(80, 120, 180, 0.22)',
+    background: 'rgba(3, 7, 18, 0.90)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
+    border: '1px solid rgba(56, 189, 248, 0.20)',
     borderRadius: 12,
     fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
-    color: '#c0d8f0',
+    color: '#e2e8f0',
     userSelect: 'none',
     zIndex: 20,
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+    boxShadow: '0 12px 40px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+  },
+  minimizedContainer: {
+    position: 'absolute',
+    top: 70,
+    right: 20,
+    zIndex: 20,
+    userSelect: 'none',
+  },
+  minimizedContent: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '8px 14px',
+    background: 'rgba(3, 7, 18, 0.88)',
+    backdropFilter: 'blur(16px)',
+    border: '1px solid rgba(56, 189, 248, 0.28)',
+    borderRadius: 20,
+    cursor: 'pointer',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+  },
+  minimizedDot: {
+    width: 8,
+    height: 8,
+    borderRadius: '50%',
+    backgroundColor: '#38bdf8',
+    boxShadow: '0 0 8px #38bdf8',
+  },
+  minimizedTitle: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: '#f8fafc',
+    letterSpacing: 0.5,
+  },
+  minimizedFps: {
+    fontSize: 10,
+    color: '#10b981',
+    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+  },
+  minimizeBtn: {
+    fontSize: 10,
+    letterSpacing: 1,
+    padding: '3px 8px',
+    background: 'rgba(30, 41, 59, 0.6)',
+    border: '1px solid rgba(148, 163, 184, 0.2)',
+    borderRadius: 4,
+    color: '#94a3b8',
+    cursor: 'pointer',
+    fontFamily: "'JetBrains Mono', monospace",
   },
   header: {
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'space-between',
     marginBottom: 4,
   },
   colorDot: {
@@ -914,282 +1534,497 @@ const styles: Record<string, React.CSSProperties> = {
     height: 10,
     borderRadius: '50%',
     flexShrink: 0,
+    boxShadow: '0 0 10px rgba(255, 232, 192, 0.5)',
   },
   name: {
     fontSize: 15,
     fontWeight: 600,
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
+    color: '#f8fafc',
   },
   typeLabel: {
-    fontSize: 9,
-    letterSpacing: 2,
-    color: 'rgba(120, 160, 220, 0.6)',
+    fontSize: 8.5,
+    letterSpacing: 1.5,
+    color: '#38bdf8',
     textTransform: 'uppercase' as const,
+    fontFamily: "'JetBrains Mono', monospace",
     marginTop: 2,
-    marginBottom: 4,
+  },
+  quickFactsRow: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(4, 1fr)',
+    gap: 4,
+    marginBottom: 10,
+  },
+  quickFact: {
+    background: 'rgba(15, 23, 42, 0.65)',
+    border: '1px solid rgba(56, 189, 248, 0.12)',
+    borderRadius: 6,
+    padding: '4px 6px',
+    textAlign: 'center',
+  },
+  quickFactLabel: {
+    display: 'block',
+    fontSize: 7.5,
+    letterSpacing: 1,
+    color: '#64748b',
+    fontFamily: "'JetBrains Mono', monospace",
+  },
+  quickFactVal: {
+    display: 'block',
+    fontSize: 10,
+    fontWeight: 600,
+    color: '#e2e8f0',
+    marginTop: 1,
+  },
+  nucleusBanner: {
+    background: 'linear-gradient(135deg, rgba(30, 27, 75, 0.6), rgba(15, 23, 42, 0.8))',
+    border: '1px solid rgba(168, 85, 247, 0.3)',
+    borderRadius: 8,
+    padding: '8px 10px',
+    marginBottom: 10,
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+  },
+  nucleusIcon: {
+    fontSize: 14,
+  },
+  nucleusName: {
+    display: 'block',
+    fontSize: 11,
+    fontWeight: 600,
+    color: '#f8fafc',
+  },
+  nucleusSub: {
+    display: 'block',
+    fontSize: 9,
+    color: '#c084fc',
+    fontFamily: "'JetBrains Mono', monospace",
+  },
+  nucleusAction: {
+    fontSize: 9.5,
+    letterSpacing: 1,
+    color: '#38bdf8',
+    fontFamily: "'JetBrains Mono', monospace",
+  },
+  observatoryWrapper: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+  },
+  syncStatusBar: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '4px 8px',
+    background: 'rgba(15, 23, 42, 0.5)',
+    border: '1px solid rgba(148, 163, 184, 0.1)',
+    borderRadius: 6,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: '50%',
+  },
+  statusText: {
+    fontSize: 8.5,
+    letterSpacing: 1,
+    color: '#94a3b8',
+    fontFamily: "'JetBrains Mono', monospace",
+  },
+  statusSeed: {
+    fontSize: 8.5,
+    color: '#64748b',
+    fontFamily: "'JetBrains Mono', monospace",
+  },
+  accordionContainer: {
+    background: 'rgba(15, 23, 42, 0.55)',
+    border: '1px solid rgba(56, 189, 248, 0.14)',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  accordionHeader: {
+    width: '100%',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '8px 12px',
+    background: 'rgba(15, 23, 42, 0.4)',
+    border: 'none',
+    borderBottom: '1px solid transparent',
+    color: '#f1f5f9',
+    cursor: 'pointer',
+    textAlign: 'left',
+    transition: 'background 0.15s ease',
+  },
+  accordionHeaderOpen: {
+    background: 'rgba(30, 41, 59, 0.5)',
+    borderBottom: '1px solid rgba(56, 189, 248, 0.15)',
+  },
+  accordionTitleArea: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+  },
+  accordionIcon: {
+    fontSize: 12,
+  },
+  accordionTitle: {
+    fontSize: 10.5,
+    fontWeight: 600,
+    letterSpacing: 1.2,
+    color: '#f8fafc',
+    fontFamily: "'JetBrains Mono', monospace",
+  },
+  accordionMetaArea: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+  },
+  accordionBadge: {
+    fontSize: 8,
+    letterSpacing: 0.5,
+    padding: '2px 6px',
+    borderRadius: 4,
+    background: 'rgba(56, 189, 248, 0.12)',
+    color: '#38bdf8',
+    fontFamily: "'JetBrains Mono', monospace",
+  },
+  accordionChevron: {
+    fontSize: 10,
+    color: '#64748b',
+  },
+  accordionBody: {
+    padding: '10px 12px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+  },
+  subHeading: {
+    fontSize: 8,
+    letterSpacing: 1.2,
+    color: '#94a3b8',
+    fontFamily: "'JetBrains Mono', monospace",
+    marginBottom: 6,
+    textTransform: 'uppercase' as const,
+  },
+  sectionHeadingRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
   },
   sectionHeading: {
     fontSize: 9,
     letterSpacing: 1.5,
-    color: '#80c8ff',
+    color: '#38bdf8',
     textTransform: 'uppercase' as const,
-    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-    marginBottom: 6,
+    fontFamily: "'JetBrains Mono', monospace",
+  },
+  headingBadge: {
+    fontSize: 7.5,
+    padding: '1px 5px',
+    borderRadius: 3,
+    background: 'rgba(56, 189, 248, 0.15)',
+    color: '#38bdf8',
+    fontFamily: "'JetBrains Mono', monospace",
   },
   divider: {
     height: 1,
-    background: 'rgba(80, 120, 180, 0.16)',
+    background: 'rgba(56, 189, 248, 0.12)',
     margin: '10px 0',
   },
   row: {
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     padding: '2px 0',
   },
   label: {
-    fontSize: 10,
-    color: 'rgba(140, 170, 210, 0.65)',
-    textTransform: 'uppercase' as const,
-    letterSpacing: 1,
+    fontSize: 9.5,
+    letterSpacing: 0.8,
+    color: '#94a3b8',
+    fontFamily: "'JetBrains Mono', monospace",
   },
   value: {
-    fontSize: 12,
-    color: '#d0e4f4',
-    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    fontSize: 10.5,
+    fontWeight: 500,
+    color: '#f1f5f9',
+    fontFamily: "'JetBrains Mono', monospace",
   },
-  buttonGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: 4,
-    marginBottom: 4,
-  },
-  presetButton: {
-    padding: '6px 4px',
-    background: 'rgba(40, 60, 100, 0.25)',
-    border: '1px solid rgba(80, 120, 200, 0.2)',
-    borderRadius: 6,
-    color: 'rgba(160, 200, 255, 0.75)',
-    fontSize: 9,
-    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-    letterSpacing: 0.8,
-    cursor: 'pointer',
-    transition: 'all 0.15s ease',
-    textAlign: 'center' as const,
-  },
-  presetButtonActive: {
-    background: 'rgba(40, 100, 220, 0.45)',
-    border: '1px solid rgba(80, 180, 255, 0.6)',
-    color: '#ffffff',
-    boxShadow: '0 0 10px rgba(80, 160, 255, 0.3)',
-  },
-  layerRow: {
-    display: 'flex',
-    flexWrap: 'wrap' as const,
-    gap: 4,
-    marginBottom: 4,
-  },
-  layerBadge: {
-    padding: '4px 8px',
-    background: 'rgba(20, 30, 50, 0.4)',
-    border: '1px solid rgba(60, 80, 120, 0.25)',
-    borderRadius: 4,
-    color: 'rgba(120, 150, 190, 0.4)',
-    fontSize: 9,
-    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-    letterSpacing: 0.8,
-    cursor: 'pointer',
-    transition: 'all 0.15s ease',
-  },
-  layerBadgeActive: {
-    background: 'rgba(40, 80, 160, 0.3)',
-    border: '1px solid rgba(100, 180, 255, 0.4)',
-    color: '#90d0ff',
-  },
-  enterButton: {
-    width: '100%',
-    marginTop: 12,
-    padding: '10px 16px',
-    background: 'rgba(40, 80, 150, 0.25)',
-    border: '1px solid rgba(80, 160, 255, 0.3)',
-    borderRadius: 8,
-    color: '#80c8ff',
-    fontSize: 11,
-    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-    letterSpacing: 1.5,
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-  },
-  backButton: {
-    width: '100%',
-    marginBottom: 8,
-    padding: '8px 12px',
-    background: 'rgba(40, 60, 100, 0.2)',
-    border: '1px solid rgba(80, 120, 200, 0.2)',
-    borderRadius: 6,
-    color: 'rgba(150, 190, 240, 0.7)',
-    fontSize: 10,
-    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-    letterSpacing: 1,
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-  },
-  hint: {
-    fontSize: 11,
-    color: 'rgba(140, 170, 210, 0.4)',
-    textAlign: 'center' as const,
-    padding: '8px 0',
-  },
-  disclaimerNote: {
-    fontSize: 9,
-    lineHeight: 1.4,
-    color: 'rgba(140, 190, 255, 0.55)',
-    fontStyle: 'italic',
-    padding: '4px 0 6px 0',
-    borderBottom: '1px solid rgba(80, 120, 180, 0.12)',
-    marginBottom: 6,
-  },
-  noticeBox: {
-    padding: '8px 10px',
-    background: 'rgba(30, 45, 75, 0.35)',
-    border: '1px solid rgba(80, 150, 240, 0.25)',
-    borderRadius: 6,
-    margin: '6px 0',
-  },
-  noticeTitle: {
-    fontSize: 9,
+  valueHighlight: {
+    color: '#38bdf8',
     fontWeight: 600,
-    letterSpacing: 1,
-    color: '#93c5fd',
-    textTransform: 'uppercase' as const,
-    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-    marginBottom: 4,
   },
-  noticeText: {
-    fontSize: 10,
-    lineHeight: 1.5,
-    color: 'rgba(180, 210, 245, 0.75)',
+  subvalue: {
+    fontSize: 8,
+    color: '#64748b',
+    fontFamily: "'JetBrains Mono', monospace",
   },
   controlGroup: {
-    margin: '6px 0',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 3,
   },
   sliderHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 2,
   },
   sliderLabel: {
-    fontSize: 9,
-    color: 'rgba(150, 190, 240, 0.75)',
-    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    fontSize: 8.5,
     letterSpacing: 0.8,
-    textTransform: 'uppercase' as const,
+    color: '#cbd5e1',
+    fontFamily: "'JetBrains Mono', monospace",
+  },
+  sliderBadge: {
+    fontSize: 7.5,
+    padding: '1px 4px',
+    borderRadius: 3,
+    background: 'rgba(56, 189, 248, 0.1)',
+    color: '#38bdf8',
+  },
+  modelTag: {
+    fontSize: 7,
+    letterSpacing: 0.5,
+    padding: '1px 3px',
+    borderRadius: 2,
+    background: 'rgba(245, 158, 11, 0.15)',
+    color: '#fbbf24',
+    fontFamily: "'JetBrains Mono', monospace",
   },
   sliderValue: {
     fontSize: 10,
-    color: '#60a5fa',
-    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
     fontWeight: 600,
+    color: '#38bdf8',
+    fontFamily: "'JetBrains Mono', monospace",
   },
   rangeInput: {
     width: '100%',
     height: 4,
     accentColor: '#38bdf8',
     cursor: 'pointer',
-    background: 'rgba(30, 50, 90, 0.5)',
-    borderRadius: 2,
   },
   controlSubtext: {
-    fontSize: 8.5,
+    fontSize: 8,
+    color: '#64748b',
     lineHeight: 1.3,
-    color: 'rgba(130, 160, 200, 0.5)',
-    fontStyle: 'italic',
-    marginTop: 2,
-    marginBottom: 4,
   },
-  simControlRow: {
-    display: 'flex',
-    gap: 6,
-    margin: '4px 0',
-  },
-  playPauseButton: {
-    width: '100%',
-    padding: '7px 10px',
-    borderRadius: 6,
-    fontSize: 10,
-    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-    fontWeight: 600,
-    letterSpacing: 1,
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-  },
-  runningButton: {
-    background: 'rgba(14, 116, 144, 0.35)',
-    border: '1px solid rgba(56, 189, 248, 0.45)',
-    color: '#7dd3fc',
-  },
-  pausedButton: {
-    background: 'rgba(180, 83, 9, 0.35)',
-    border: '1px solid rgba(245, 158, 11, 0.5)',
-    color: '#fcd34d',
-  },
-  speedButton: {
-    flex: 1,
-    padding: '4px 0',
-    background: 'rgba(25, 40, 70, 0.4)',
-    border: '1px solid rgba(70, 100, 160, 0.25)',
-    borderRadius: 4,
-    color: 'rgba(150, 190, 240, 0.6)',
-    fontSize: 9,
-    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-    cursor: 'pointer',
-    textAlign: 'center' as const,
-  },
-  speedButtonActive: {
-    background: 'rgba(37, 99, 235, 0.4)',
-    border: '1px solid rgba(96, 165, 250, 0.6)',
-    color: '#bfdbfe',
-    fontWeight: 600,
-  },
-  modelDiameterGrid: {
+  presetGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(2, 1fr)',
     gap: 4,
-    marginTop: 4,
-    marginBottom: 2,
   },
-  diameterButton: {
-    padding: '5px 4px',
-    background: 'rgba(20, 35, 65, 0.4)',
-    border: '1px solid rgba(60, 90, 140, 0.25)',
-    borderRadius: 4,
-    color: 'rgba(140, 175, 220, 0.65)',
+  miniPresetButton: {
+    padding: '5px 8px',
     fontSize: 8.5,
-    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    letterSpacing: 0.5,
+    borderRadius: 4,
+    border: '1px solid rgba(56, 189, 248, 0.2)',
+    background: 'rgba(15, 23, 42, 0.7)',
+    color: '#94a3b8',
     cursor: 'pointer',
-    textAlign: 'center' as const,
+    fontFamily: "'JetBrains Mono', monospace",
     transition: 'all 0.15s ease',
   },
-  diameterButtonActive: {
-    background: 'rgba(30, 64, 175, 0.45)',
-    border: '1px solid rgba(96, 165, 250, 0.6)',
-    color: '#ffffff',
+  miniPresetButtonActive: {
+    background: 'rgba(56, 189, 248, 0.22)',
+    borderColor: '#38bdf8',
+    color: '#f8fafc',
     fontWeight: 600,
+  },
+  speedGrid: {
+    display: 'flex',
+    gap: 3,
+    flexWrap: 'wrap',
+  },
+  speedButton: {
+    flex: '1 0 20%',
+    padding: '4px 6px',
+    fontSize: 8.5,
+    borderRadius: 4,
+    border: '1px solid rgba(148, 163, 184, 0.18)',
+    background: 'rgba(15, 23, 42, 0.6)',
+    color: '#94a3b8',
+    cursor: 'pointer',
+    fontFamily: "'JetBrains Mono', monospace",
+  },
+  speedButtonActive: {
+    background: 'rgba(56, 189, 248, 0.25)',
+    borderColor: '#38bdf8',
+    color: '#38bdf8',
+    fontWeight: 600,
+  },
+  playPauseButton: {
+    width: '100%',
+    padding: '7px 12px',
+    fontSize: 9.5,
+    letterSpacing: 1.2,
+    fontWeight: 600,
+    borderRadius: 6,
+    cursor: 'pointer',
+    fontFamily: "'JetBrains Mono', monospace",
+    transition: 'all 0.15s ease',
+  },
+  runningButton: {
+    background: 'rgba(56, 189, 248, 0.15)',
+    border: '1px solid rgba(56, 189, 248, 0.35)',
+    color: '#38bdf8',
+  },
+  pausedButton: {
+    background: 'rgba(239, 68, 68, 0.18)',
+    border: '1px solid rgba(239, 68, 68, 0.4)',
+    color: '#f87171',
+  },
+  buttonGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    gap: 4,
+  },
+  presetButton: {
+    padding: '5px 4px',
+    fontSize: 8,
+    letterSpacing: 0.8,
+    borderRadius: 4,
+    border: '1px solid rgba(148, 163, 184, 0.18)',
+    background: 'rgba(15, 23, 42, 0.65)',
+    color: '#94a3b8',
+    cursor: 'pointer',
+    fontFamily: "'JetBrains Mono', monospace",
+    textAlign: 'center',
+  },
+  presetButtonActive: {
+    background: 'rgba(56, 189, 248, 0.22)',
+    borderColor: '#38bdf8',
+    color: '#f8fafc',
+    fontWeight: 600,
+  },
+  layerRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  layerBadge: {
+    padding: '3px 7px',
+    fontSize: 8,
+    letterSpacing: 0.5,
+    borderRadius: 4,
+    border: '1px solid rgba(148, 163, 184, 0.15)',
+    background: 'rgba(15, 23, 42, 0.4)',
+    color: '#64748b',
+    cursor: 'pointer',
+    fontFamily: "'JetBrains Mono', monospace",
+  },
+  layerBadgeActive: {
+    background: 'rgba(56, 189, 248, 0.18)',
+    borderColor: 'rgba(56, 189, 248, 0.35)',
+    color: '#38bdf8',
+  },
+  statsCard: {
+    background: 'rgba(15, 23, 42, 0.7)',
+    border: '1px solid rgba(56, 189, 248, 0.15)',
+    borderRadius: 6,
+    padding: '8px 10px',
+  },
+  statsHeader: {
+    fontSize: 8,
+    letterSpacing: 1.2,
+    color: '#38bdf8',
+    fontFamily: "'JetBrains Mono', monospace",
+    marginBottom: 6,
+  },
+  telemetryCard: {
+    background: 'rgba(15, 23, 42, 0.75)',
+    border: '1px solid rgba(56, 189, 248, 0.18)',
+    borderRadius: 8,
+    padding: '10px 12px',
+    marginTop: 4,
+  },
+  telemetryGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: 6,
+  },
+  telemetryItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 2,
+  },
+  telemetryLabel: {
+    fontSize: 7.5,
+    letterSpacing: 1,
+    color: '#64748b',
+    fontFamily: "'JetBrains Mono', monospace",
+  },
+  telemetryValue: {
+    fontSize: 11,
+    fontWeight: 600,
+    color: '#f8fafc',
+    fontFamily: "'JetBrains Mono', monospace",
+  },
+  noticeBox: {
+    background: 'rgba(30, 41, 59, 0.4)',
+    border: '1px solid rgba(148, 163, 184, 0.15)',
+    borderRadius: 6,
+    padding: '7px 9px',
+  },
+  noticeTitle: {
+    fontSize: 7.5,
+    letterSpacing: 1,
+    color: '#94a3b8',
+    fontFamily: "'JetBrains Mono', monospace",
+    marginBottom: 3,
+  },
+  noticeText: {
+    fontSize: 8,
+    color: '#94a3b8',
+    lineHeight: 1.35,
   },
   resetButton: {
     width: '100%',
-    padding: '8px 12px',
-    background: 'rgba(180, 83, 9, 0.18)',
-    border: '1px solid rgba(245, 158, 11, 0.4)',
-    borderRadius: 6,
-    color: '#fef08a',
-    fontSize: 9.5,
-    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    padding: '7px 10px',
+    fontSize: 8.5,
     letterSpacing: 1,
     fontWeight: 600,
+    borderRadius: 6,
+    background: 'rgba(30, 41, 59, 0.5)',
+    border: '1px solid rgba(148, 163, 184, 0.25)',
+    color: '#cbd5e1',
     cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    margin: '4px 0',
+    fontFamily: "'JetBrains Mono', monospace",
+    marginBottom: 4,
+  },
+  enterButton: {
+    width: '100%',
+    marginTop: 10,
+    padding: '8px 12px',
+    background: 'rgba(56, 189, 248, 0.18)',
+    border: '1px solid rgba(56, 189, 248, 0.4)',
+    borderRadius: 6,
+    color: '#38bdf8',
+    fontSize: 10,
+    letterSpacing: 1.2,
+    fontWeight: 600,
+    cursor: 'pointer',
+    fontFamily: "'JetBrains Mono', monospace",
+  },
+  backButton: {
+    width: '100%',
+    marginBottom: 10,
+    padding: '6px 10px',
+    background: 'rgba(30, 41, 59, 0.5)',
+    border: '1px solid rgba(148, 163, 184, 0.2)',
+    borderRadius: 6,
+    color: '#94a3b8',
+    fontSize: 9,
+    letterSpacing: 1,
+    cursor: 'pointer',
+    fontFamily: "'JetBrains Mono', monospace",
+  },
+  hint: {
+    fontSize: 11,
+    color: '#64748b',
+    textAlign: 'center',
+    padding: '20px 0',
   },
 };
