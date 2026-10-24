@@ -47,7 +47,7 @@ export const DEFAULT_LAYER_VISIBILITY: GalaxyLayerVisibility = {
   clusters: true,
   halo: true,
   nucleus: true,
-  jets: true,
+  jets: false,
   accretion: true,
 };
 
@@ -194,7 +194,7 @@ const DIFFUSE_EMISSION_VERTEX_SHADER = `
     float dist = length(mvPosition.xyz);
 
     float attenuation = 2800.0 / (dist + 800.0);
-    gl_PointSize = clamp(aSize * uPixelRatio * attenuation, 2.5, 96.0);
+    gl_PointSize = clamp(aSize * uPixelRatio * attenuation, 2.0, 48.0);
 
     gl_Position = projectionMatrix * mvPosition;
   }
@@ -574,7 +574,6 @@ function DustField({
     const armCount = armDefs && armDefs.length > 0 ? armDefs.length : galaxy.spiralArms.armCount;
     const windingFactor = galaxy.spiralArms.windingFactor;
     const galaxyRadius = galaxy.radius;
-    const diskThickness = galaxy.thickness;
     const bar = galaxy.bar;
 
     // Configurable dark dust tracers tracing spiral arm compression and bar shocks
@@ -635,21 +634,21 @@ function DustField({
         const armIndex = i % armDefs.length;
         const arm = armDefs[armIndex];
         const idealAngle = arm.startAngle + (1.0 / Math.tan(arm.pitchAngleRad)) * Math.log(Math.max(r, 0.1) / Math.max(arm.startRadius, 0.1));
-        const armWidthKpc = (arm.startRadius * 0.035 + arm.widthExpansionCoeff * 0.30 * r) * dustCoverage;
+        const armWidthKpc = (arm.startRadius * 0.08 + arm.widthExpansionCoeff * 0.70 * r) * dustCoverage;
         // Shift to inner concave edge of the density wave
-        const dustOffset = -armWidthKpc * 0.45 + rng.gaussian(0, armWidthKpc * 0.22);
+        const dustOffset = -armWidthKpc * 0.40 + rng.gaussian(0, armWidthKpc * 0.20);
         theta = idealAngle + dustOffset / Math.max(r, 0.5);
       } else {
         const armIndex = i % armCount;
         const armPhase = galaxy.spiralArms.armOffset + (armIndex * Math.PI * 2) / armCount;
         const idealAngle = windingFactor * Math.log(Math.max(r, 0.1) / 0.5) + armPhase;
-        const armWidthKpc = galaxy.spiralArms.armWidth * galaxyRadius * 0.35 * dustCoverage;
-        const dustOffset = -armWidthKpc * 0.45 + rng.gaussian(0, armWidthKpc * 0.22);
+        const armWidthKpc = galaxy.spiralArms.armWidth * galaxyRadius * 0.65 * dustCoverage;
+        const dustOffset = -armWidthKpc * 0.40 + rng.gaussian(0, armWidthKpc * 0.20);
         theta = idealAngle + dustOffset / Math.max(r, 0.5);
       }
 
       positions[idx * 3] = r * Math.cos(theta) * RENDER_SCALE_KPC;
-      positions[idx * 3 + 1] = rng.gaussian(0, diskThickness * 0.05) * RENDER_SCALE_KPC;
+      positions[idx * 3 + 1] = rng.gaussian(0, 0.14) * RENDER_SCALE_KPC;
       positions[idx * 3 + 2] = r * Math.sin(theta) * RENDER_SCALE_KPC;
 
       // Dark soot absorption with subtle warm forward-scattering starlight
@@ -970,19 +969,21 @@ function DiffuseGalacticEmission({
       if (armDefs && armDefs.length > 0) {
         const arm = armDefs[armIdx % armDefs.length];
         idealAngle = arm.startAngle + (1.0 / Math.tan(arm.pitchAngleRad)) * Math.log(Math.max(r, 0.1) / Math.max(arm.startRadius, 0.1));
-        armWidthKpc = (arm.startRadius * 0.035 + arm.widthExpansionCoeff * 0.30 * r) * cloudCoverage;
+        armWidthKpc = (arm.startRadius * 0.08 + arm.widthExpansionCoeff * 0.85 * r) * cloudCoverage;
       } else {
         const armPhase = galaxy.spiralArms.armOffset + (armIdx * Math.PI * 2) / armCount;
         idealAngle = windingFactor * Math.log(Math.max(r, 0.1) / 0.5) + armPhase;
-        armWidthKpc = galaxy.spiralArms.armWidth * galaxyRadius * 0.4 * cloudCoverage;
+        armWidthKpc = galaxy.spiralArms.armWidth * galaxyRadius * 0.75 * cloudCoverage;
       }
 
       const scatter = rng.gaussian(0, armWidthKpc);
-      const theta = idealAngle + scatter / Math.max(r, 1.0);
+      const rDisp = rng.gaussian(0, armWidthKpc * 0.20);
+      const rActual = Math.max(rMin, r + rDisp);
+      const theta = idealAngle + scatter / Math.max(rActual, 1.0);
 
-      positions[idx * 3] = r * Math.cos(theta) * RENDER_SCALE_KPC;
-      positions[idx * 3 + 1] = rng.gaussian(0, galaxy.thickness * 0.12) * RENDER_SCALE_KPC;
-      positions[idx * 3 + 2] = r * Math.sin(theta) * RENDER_SCALE_KPC;
+      positions[idx * 3] = rActual * Math.cos(theta) * RENDER_SCALE_KPC;
+      positions[idx * 3 + 1] = rng.gaussian(0, 0.18) * RENDER_SCALE_KPC;
+      positions[idx * 3 + 2] = rActual * Math.sin(theta) * RENDER_SCALE_KPC;
 
       if (showDisk) {
         // Natural transition: warm starlight in inner arm -> radiant blue-white in active outer arm
@@ -1025,12 +1026,14 @@ function DiffuseGalacticEmission({
       }
 
       // Slightly offset on the outer shock ridge
-      const armWidthKpc = (galaxy.spiralArms.armWidth * galaxyRadius) * 0.25 * cloudCoverage;
-      const theta = idealAngle + rng.gaussian(0, armWidthKpc) / Math.max(r, 1.0);
+      const armWidthKpc = (galaxy.spiralArms.armWidth * galaxyRadius) * 0.40 * cloudCoverage;
+      const rDisp = rng.gaussian(0, armWidthKpc * 0.15);
+      const rActual = Math.max(rMin, r + rDisp);
+      const theta = idealAngle + rng.gaussian(0, armWidthKpc) / Math.max(rActual, 1.0);
 
-      positions[idx * 3] = r * Math.cos(theta) * RENDER_SCALE_KPC;
-      positions[idx * 3 + 1] = rng.gaussian(0, galaxy.thickness * 0.08) * RENDER_SCALE_KPC;
-      positions[idx * 3 + 2] = r * Math.sin(theta) * RENDER_SCALE_KPC;
+      positions[idx * 3] = rActual * Math.cos(theta) * RENDER_SCALE_KPC;
+      positions[idx * 3 + 1] = rng.gaussian(0, 0.14) * RENDER_SCALE_KPC;
+      positions[idx * 3 + 2] = rActual * Math.sin(theta) * RENDER_SCALE_KPC;
 
       if (showClusters && showDisk) {
         // Delicate pink-magenta H-alpha emission (656.3 nm proxy) with occasional cyan O III knots
@@ -1356,11 +1359,9 @@ function RelativisticJetsRenderer({ galaxy, time = 0 }: RelativisticJetsProps) {
   if (!nucleus) return null;
 
   const jetLengthKpc = nucleus.jetLengthKpc ?? 52.0;
-  const radioLobeRadiusKpc = nucleus.radioLobeRadiusKpc ?? 18.0;
 
-  // Scene scaling for colossal radio jets: length ~540 scene units
+  // Scene scaling for collimated radio jets: length ~540 scene units
   const jetLengthScene = Math.min(750, Math.max(300, jetLengthKpc * RENDER_SCALE_KPC * 0.35));
-  const lobeRadiusScene = Math.min(180, Math.max(70, radioLobeRadiusKpc * RENDER_SCALE_KPC * 0.30));
 
   const northMatRef = useRef<THREE.ShaderMaterial>(null);
   const southMatRef = useRef<THREE.ShaderMaterial>(null);
@@ -1374,23 +1375,23 @@ function RelativisticJetsRenderer({ galaxy, time = 0 }: RelativisticJetsProps) {
     north: {
       uTime: { value: 0 },
       uColorCore: { value: new THREE.Color('#93c5fd') },
-      uColorSheath: { value: new THREE.Color('#c084fc') },
-      uOpacity: { value: 0.32 },
+      uColorSheath: { value: new THREE.Color('#a855f7') },
+      uOpacity: { value: 0.12 },
     },
     south: {
       uTime: { value: 0 },
       uColorCore: { value: new THREE.Color('#93c5fd') },
-      uColorSheath: { value: new THREE.Color('#c084fc') },
-      uOpacity: { value: 0.32 },
+      uColorSheath: { value: new THREE.Color('#a855f7') },
+      uOpacity: { value: 0.12 },
     },
   }), []);
 
   return (
     <group position={[0, 0, 0]}>
-      {/* 1. North Jet Beam (+Y) */}
+      {/* 1. North Relativistic Outflow Stream (+Y) */}
       <group position={[0, jetLengthScene * 0.5, 0]}>
         <mesh>
-          <cylinderGeometry args={[18.0, 1.2, jetLengthScene, 32, 16, true]} />
+          <cylinderGeometry args={[2.5, 0.4, jetLengthScene, 24, 8, true]} />
           <shaderMaterial
             ref={northMatRef}
             vertexShader={JET_VERTEX_SHADER}
@@ -1402,24 +1403,12 @@ function RelativisticJetsRenderer({ galaxy, time = 0 }: RelativisticJetsProps) {
             depthWrite={false}
           />
         </mesh>
-        {/* Inner intense relativistic spine */}
-        <mesh>
-          <cylinderGeometry args={[5.5, 0.4, jetLengthScene * 0.98, 20, 8, true]} />
-          <meshBasicMaterial
-            color="#7dd3fc"
-            transparent
-            opacity={0.45}
-            side={THREE.DoubleSide}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
       </group>
 
-      {/* 2. South Jet Beam (-Y) */}
+      {/* 2. South Relativistic Outflow Stream (-Y) */}
       <group position={[0, -jetLengthScene * 0.5, 0]} rotation={[Math.PI, 0, 0]}>
         <mesh>
-          <cylinderGeometry args={[18.0, 1.2, jetLengthScene, 32, 16, true]} />
+          <cylinderGeometry args={[2.5, 0.4, jetLengthScene, 24, 8, true]} />
           <shaderMaterial
             ref={southMatRef}
             vertexShader={JET_VERTEX_SHADER}
@@ -1427,66 +1416,6 @@ function RelativisticJetsRenderer({ galaxy, time = 0 }: RelativisticJetsProps) {
             uniforms={jetShaderUniforms.south}
             transparent
             side={THREE.DoubleSide}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
-        {/* Inner intense relativistic spine */}
-        <mesh>
-          <cylinderGeometry args={[5.5, 0.4, jetLengthScene * 0.98, 20, 8, true]} />
-          <meshBasicMaterial
-            color="#7dd3fc"
-            transparent
-            opacity={0.45}
-            side={THREE.DoubleSide}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
-      </group>
-
-      {/* 3. North Terminal Synchrotron Radio Lobe (+Y) */}
-      <group position={[0, jetLengthScene + lobeRadiusScene * 0.45, 0]}>
-        <mesh scale={[1.35, 1.85, 1.35]}>
-          <sphereGeometry args={[lobeRadiusScene, 24, 24]} />
-          <meshBasicMaterial
-            color="#818cf8"
-            transparent
-            opacity={0.16}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
-        <mesh scale={[1.05, 1.45, 1.05]}>
-          <sphereGeometry args={[lobeRadiusScene * 0.75, 20, 20]} />
-          <meshBasicMaterial
-            color="#38bdf8"
-            transparent
-            opacity={0.22}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
-      </group>
-
-      {/* 4. South Terminal Synchrotron Radio Lobe (-Y) */}
-      <group position={[0, -jetLengthScene - lobeRadiusScene * 0.45, 0]}>
-        <mesh scale={[1.35, 1.85, 1.35]}>
-          <sphereGeometry args={[lobeRadiusScene, 24, 24]} />
-          <meshBasicMaterial
-            color="#818cf8"
-            transparent
-            opacity={0.16}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
-        <mesh scale={[1.05, 1.45, 1.05]}>
-          <sphereGeometry args={[lobeRadiusScene * 0.75, 20, 20]} />
-          <meshBasicMaterial
-            color="#38bdf8"
-            transparent
-            opacity={0.22}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />

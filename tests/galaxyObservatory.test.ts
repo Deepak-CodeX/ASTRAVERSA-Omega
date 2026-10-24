@@ -16,7 +16,7 @@ import { RENDER_SCALE_KPC } from '../src/astronomy/constants';
 
 describe('Galaxy Observatory System', () => {
   describe('Layer Visibility Configuration', () => {
-    it('has all visual layers active by default, including bar, nucleus, jets, and accretion', () => {
+    it('has primary galactic visual layers active by default with radio jets disabled in normal overview', () => {
       expect(DEFAULT_LAYER_VISIBILITY).toEqual({
         disk: true,
         bar: true,
@@ -25,7 +25,7 @@ describe('Galaxy Observatory System', () => {
         clusters: true,
         halo: true,
         nucleus: true,
-        jets: true,
+        jets: false,
         accretion: true,
       });
     });
@@ -40,13 +40,13 @@ describe('Galaxy Observatory System', () => {
       expect(state.bar).toBe(true);
       expect(state.bulge).toBe(true);
       expect(state.nucleus).toBe(true);
-      expect(state.jets).toBe(true);
+      expect(state.jets).toBe(false);
       expect(state.accretion).toBe(true);
 
-      // Toggle jets and accretion off
-      state.jets = false;
+      // Toggle jets on and accretion off
+      state.jets = true;
       state.accretion = false;
-      expect(state.jets).toBe(false);
+      expect(state.jets).toBe(true);
       expect(state.accretion).toBe(false);
 
       // Toggle halo layer off
@@ -135,6 +135,33 @@ describe('Galaxy Observatory System', () => {
       const edgeSpeed = calculateSpeed(20.0);
       expect(edgeSpeed).toBeGreaterThan(210);
       expect(edgeSpeed).toBeLessThan(225);
+    });
+
+    it('generates spiral arms as a genuine geometrically flattened disk without vertical walls', () => {
+      const galaxy = generateGalaxy(42, { quality: 'LOW' });
+      const bulgeCount = Math.floor(galaxy.stars.length * 0.10);
+      const barCount = Math.floor(galaxy.stars.length * 0.16);
+      const armCount = Math.floor(galaxy.stars.length * 0.54);
+
+      // Extract arm stars
+      const armStars = galaxy.stars.slice(bulgeCount + barCount, bulgeCount + barCount + armCount);
+      expect(armStars.length).toBeGreaterThan(1000);
+
+      // Verify thin vertical distribution
+      let sumYSq = 0;
+      let maxAbsY = 0;
+      for (const s of armStars) {
+        sumYSq += s.y * s.y;
+        if (Math.abs(s.y) > maxAbsY) maxAbsY = Math.abs(s.y);
+      }
+      const sigmaY = Math.sqrt(sumYSq / armStars.length);
+
+      // Vertical dispersion sigma_y should be < 0.40 kpc (physically thin disk relative to R ~ 76.65 kpc)
+      expect(sigmaY).toBeLessThan(0.40);
+      // Even peak vertical deviation must be thin (< 1.5 kpc)
+      expect(maxAbsY).toBeLessThan(1.5);
+      // Scale height ratio: sigma_y / R_disk < 0.01 (aspect ratio > 100:1)
+      expect(sigmaY / galaxy.radius).toBeLessThan(0.01);
     });
   });
 

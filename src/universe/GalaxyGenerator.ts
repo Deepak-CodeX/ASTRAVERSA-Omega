@@ -483,7 +483,7 @@ function generateBarredStarCluster(
   index: number,
   rng: SeededRandom,
   galaxyRadius: number,
-  galaxyThickness: number,
+  _galaxyThickness: number,
   _bar: BarParams,
   armDefs: SpiralArmDefinition[]
 ): StarCluster {
@@ -498,7 +498,7 @@ function generateBarredStarCluster(
 
   const x = r * Math.cos(theta);
   const z = r * Math.sin(theta);
-  const y = rng.gaussian(0, galaxyThickness * 0.18);
+  const y = rng.gaussian(0, 0.20);
 
   const clusterRadius = rng.range(0.2, 0.9); // kpc
   const populationEstimate = rng.rangeInt(500, 25000);
@@ -592,8 +592,8 @@ function generateBarredGalaxyStars(
     const r = arm.startRadius + rFraction * (galaxyRadius * 0.90 - arm.startRadius);
 
     const idealAngle = barredSpiralArmAngle(r, arm.startRadius, arm.startAngle, arm.pitchAngleRad);
-    // Tighter arm spine width for crisp, coherent four-arm definition
-    const widthAtR = (arm.startRadius * 0.040 + arm.widthExpansionCoeff * 0.38 * r) * armWidthMult;
+    // Broad, physically coherent in-plane arm density wave
+    const widthAtR = (arm.startRadius * 0.08 + arm.widthExpansionCoeff * 0.90 * r) * armWidthMult;
     const scatter = sRng.gaussian(0, widthAtR);
     // Organic spur branches on ~10% of stars with constant PRNG call sequence
     const spurRoll = sRng.next();
@@ -604,10 +604,8 @@ function generateBarredGalaxyStars(
     const x = r * Math.cos(theta);
     const z = r * Math.sin(theta);
 
-    // Dual thin/thick disk vertical distribution
-    const isThick = sRng.next() < diskStructure.thickDiskFraction;
-    const scaleH = isThick ? diskStructure.thickScaleHeight : diskStructure.thinScaleHeight;
-    const y = sRng.gaussian(0, scaleH * 0.35);
+    // Spiral arm stars strictly populate the geometrically thin stellar disk (aspect ratio > 100:1)
+    const y = sRng.gaussian(0, diskStructure.thinScaleHeight * 0.16);
 
     // Metallicity gradient
     const radialFrac = r / galaxyRadius;
