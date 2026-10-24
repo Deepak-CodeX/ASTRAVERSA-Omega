@@ -59,7 +59,7 @@ export function App() {
   const [selectedStarIndex, setSelectedStarIndex] = useState<number | null>(null);
   const [selectedNucleus, setSelectedNucleus] = useState<boolean>(false);
   const [selectedBodyId, setSelectedBodyId] = useState<string | null>(null);
-  const [, setTick] = useState(0);
+  const [tick, setTick] = useState(0);
 
   // ── Observatory State ───────────────────────────
   const [layers, setLayers] = useState<GalaxyLayerVisibility>(DEFAULT_LAYER_VISIBILITY);
@@ -104,11 +104,14 @@ export function App() {
 
   // Current selected body in system view
   const selectedBody: CelestialBody | null = useMemo(() => {
-    if (inSystemView && selectedBodyId) {
-      return universe.findBody(selectedBodyId) ?? null;
+    if (inSystemView) {
+      if (selectedBodyId) {
+        return universe.findBody(selectedBodyId) ?? universe.bodies[0] ?? null;
+      }
+      return universe.bodies[0] ?? null;
     }
     return null;
-  }, [inSystemView, selectedBodyId, universe]);
+  }, [inSystemView, selectedBodyId, universe, tick]);
 
   // ── Galaxy View Handlers ────────────────────────
 
@@ -338,6 +341,29 @@ export function App() {
       engine.setStarAge(star, 0);
       setTick(t => t + 1);
     }
+  }, [universe, engine]);
+
+  // Expose test/debug handle on window
+  useEffect(() => {
+    (window as any).__astraversa = {
+      universe,
+      engine,
+      enterSystem: (starIndex: number = 0) => {
+        setSelectedStarIndex(starIndex);
+        const system = universe.enterStarSystem(starIndex);
+        if (system) {
+          engine.initialize(system.bodies);
+          engine.start(1);
+          setViewLevel(ViewLevel.SYSTEM);
+          setSelectedBodyId(system.bodies[0]?.id ?? null);
+          setTick(t => t + 1);
+        }
+      },
+      selectBody: (id: string | null) => {
+        setSelectedBodyId(id);
+        setTick(t => t + 1);
+      },
+    };
   }, [universe, engine]);
 
   // Periodically update time display

@@ -248,12 +248,44 @@ Universe Seed (42)
     → Star Seed (derived via fork(2000).fork(region).fork(starIndex))
       → Solar System Seed (= Star Seed, passed to generateSolarSystem)
         → Planet Seed (derived via fork(planetIndex))
+          → Planetary Albedo Seed (isolated via deriveSeed(777))
     → Extended Halo Seed (isolated via fork(1500))
     → Spiral Arm Geometry Seed (isolated via fork(1600))
     → Dust Shock Lanes Seed (isolated via fork(1700))
     → H II Starburst Seed (isolated via fork(1800))
     → Nucleus & SMBH Seed (isolated via fork(1900))
 ```
+
+---
+
+## Stellar–Planetary Coupling Architecture (Mission 004B)
+
+### Coupling Pipeline & Data Flow
+
+```
+Stellar Evolution Model (L_star, T_eff)
+  │
+  ├──> computeHabitableZone(L_star, T_eff)
+  │      └──> starProperties.habitableZone (Conservative & Optimistic AU/m)
+  │
+  └──> For each orbiting planet (d, A):
+         ├──> computeEquilibriumTemperature(L_star, d, A)
+         │      └──> planetProperties.equilibriumTemperature (K)
+         ├──> computeInsolationFlux(L_star, d)
+         │      └──> planetProperties.insolationFlux (W/m²)
+         │      └──> planetProperties.insolationRelative (S / S_0)
+         └──> classifyHabitability(d, starProperties.habitableZone)
+                └──> planetProperties.habitabilityStatus
+```
+
+### Dynamic Coupling Synchronization
+
+1. **System Generation:** `SolarSystemGenerator` derives initial circumstellar habitable zones and planet radiative equilibrium values using isolated PRNG child streams to guarantee deterministic reproduction of planetary positions and orbital parameters.
+2. **Simulation Lifecycle:** `SimulationEngine.updatePlanetaryCoupling(star)` synchronizes all orbiting bodies whenever:
+   - The engine is initialized with celestial bodies (`initialize`).
+   - Stellar age advances during simulation time (`advanceStellarAge`).
+   - The user interactively steps the stellar age timeline (+500 Myr, +1.0 Gyr, +2.5 Gyr, or reset to ZAMS) via `setStarAge`.
+3. **Decoupled Inspector Presentation:** UI inspectors (`UnifiedInfoPanel`, `SystemPlanetInfo`, `SystemStarInfo`, and `InfoPanel`) display values directly from authoritative body properties without duplicating state or recomputing physics.
 
 ---
 

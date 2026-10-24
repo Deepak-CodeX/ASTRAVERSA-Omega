@@ -14,6 +14,10 @@ import { Vector3 } from '../physics/Vector3';
 import type { PlanetType } from '../astronomy/planetary';
 import type { SpectralClass } from '../astronomy/stellar';
 import type { StellarEvolutionState } from '../astronomy/stellarEvolution';
+import type {
+  HabitableZoneBoundaries,
+  HabitabilityStatus,
+} from '../astronomy/stellarPlanetaryCoupling';
 
 /**
  * Types of celestial bodies.
@@ -34,6 +38,8 @@ export interface StarProperties {
   luminosity: number;  // W
   temperature: number; // K
   evolution?: StellarEvolutionState;
+  /** Circumstellar habitable zone boundaries (Mission 004B) */
+  habitableZone?: HabitableZoneBoundaries;
 }
 
 /**
@@ -44,6 +50,18 @@ export interface PlanetProperties {
   orbitalRadius: number;  // m (semi-major axis)
   orbitalPeriod: number;  // seconds
   parentId: string;       // ID of the parent star
+
+  // Stellar–Planetary Coupling (Mission 004B)
+  /** Planetary Bond albedo (dimensionless fraction in [0, 1)) */
+  albedo: number;
+  /** Radiative-equilibrium temperature (K) assuming uniform global redistribution */
+  equilibriumTemperature: number;
+  /** Incident stellar insolation flux at planetary orbital radius (W/m²) */
+  insolationFlux: number;
+  /** Insolation relative to present-day Earth solar flux (S / S_0) */
+  insolationRelative: number;
+  /** Circumstellar habitable zone classification based on Kopparapu et al. (2013) */
+  habitabilityStatus: HabitabilityStatus;
 }
 
 /**

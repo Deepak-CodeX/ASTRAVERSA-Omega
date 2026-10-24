@@ -17,6 +17,14 @@ import { CelestialBodyType, type CelestialBody } from '../universe/CelestialBody
 import { G, secondsToYears } from '../astronomy/constants';
 import { computeStellarEvolution } from '../astronomy/stellarEvolution';
 import type { SpectralClass } from '../astronomy/stellar';
+import {
+  computeHabitableZone,
+  computeEquilibriumTemperature,
+  computeInsolationFlux,
+  computeRelativeInsolation,
+  classifyHabitability,
+  getDefaultBondAlbedo,
+} from '../astronomy/stellarPlanetaryCoupling';
 
 /**
  * Simulation engine state.
@@ -57,6 +65,13 @@ export class SimulationEngine {
 
     // Compute initial accelerations
     this.computeAccelerations();
+
+    // Ensure initial stellar-planetary coupling is evaluated for all stars
+    for (const body of this._bodies) {
+      if (body.type === CelestialBodyType.STAR) {
+        this.updatePlanetaryCoupling(body);
+      }
+    }
   }
 
   /**
@@ -143,6 +158,38 @@ export class SimulationEngine {
     star.starProperties.luminosity = nextEvolution.luminosityWatts;
     star.starProperties.temperature = nextEvolution.effectiveTemperature;
     star.starProperties.evolution = nextEvolution;
+
+    // Dynamically update circumstellar habitable zone and all orbiting planetary equilibrium temperatures
+    this.updatePlanetaryCoupling(star);
+  }
+
+  /**
+   * Update stellar-planetary coupling for all planets orbiting this star.
+   * Recalculates star habitable zone and planetary radiative-equilibrium temperatures.
+   */
+  updatePlanetaryCoupling(star: CelestialBody): void {
+    if (!star.starProperties) return;
+    const luminosity = star.starProperties.luminosity;
+    const temperature = star.starProperties.temperature;
+
+    // Recalculate circumstellar habitable zone
+    const hz = computeHabitableZone(luminosity, temperature);
+    star.starProperties.habitableZone = hz;
+
+    // Update each planet orbiting this star
+    for (const body of this._bodies) {
+      if (body.type === CelestialBodyType.PLANET && body.planetProperties?.parentId === star.id) {
+        const pp = body.planetProperties;
+        const dist = pp.orbitalRadius;
+        const albedo = pp.albedo ?? getDefaultBondAlbedo(pp.planetType);
+
+        pp.albedo = albedo;
+        pp.equilibriumTemperature = computeEquilibriumTemperature(luminosity, dist, albedo);
+        pp.insolationFlux = computeInsolationFlux(luminosity, dist);
+        pp.insolationRelative = computeRelativeInsolation(pp.insolationFlux);
+        pp.habitabilityStatus = classifyHabitability(dist, hz);
+      }
+    }
   }
 
   /**

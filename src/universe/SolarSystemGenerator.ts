@@ -26,6 +26,14 @@ import {
   computeMainSequenceLifetime,
 } from '../astronomy/stellarEvolution';
 import {
+  computeHabitableZone,
+  computeEquilibriumTemperature,
+  computeInsolationFlux,
+  computeRelativeInsolation,
+  classifyHabitability,
+  sampleBondAlbedo,
+} from '../astronomy/stellarPlanetaryCoupling';
+import {
   getPlanetType,
   getPlanetTypeData,
   circularOrbitalVelocity,
@@ -148,6 +156,11 @@ export function generateSolarSystem(seed: number): SolarSystem {
     ageYears: initialAgeYears,
   });
 
+  const habitableZone = computeHabitableZone(
+    evolution.luminosityWatts,
+    evolution.effectiveTemperature
+  );
+
   const star = createCelestialBody({
     id: `star-${seed}`,
     name: starName,
@@ -163,6 +176,7 @@ export function generateSolarSystem(seed: number): SolarSystem {
       luminosity: evolution.luminosityWatts,
       temperature: evolution.effectiveTemperature,
       evolution,
+      habitableZone,
     },
   });
 
@@ -227,6 +241,25 @@ export function generateSolarSystem(seed: number): SolarSystem {
     const planetName = `${starName} ${ROMAN_NUMERALS[i] || (i + 1).toString()}`;
     const color = planetRng.pick(typeData.colors);
 
+    // Derived albedo using isolated child seed to preserve determinism
+    const albedoRng = new SeededRandom(planetRng.deriveSeed(777));
+    const albedo = sampleBondAlbedo(planetType, albedoRng);
+
+    const equilibriumTemperature = computeEquilibriumTemperature(
+      star.starProperties!.luminosity,
+      orbitalDistanceM,
+      albedo
+    );
+    const insolationFlux = computeInsolationFlux(
+      star.starProperties!.luminosity,
+      orbitalDistanceM
+    );
+    const insolationRelative = computeRelativeInsolation(insolationFlux);
+    const habitabilityStatus = classifyHabitability(
+      orbitalDistanceM,
+      habitableZone
+    );
+
     planets.push(createCelestialBody({
       id: `planet-${seed}-${i}`,
       name: planetName,
@@ -242,6 +275,11 @@ export function generateSolarSystem(seed: number): SolarSystem {
         orbitalRadius: orbitalDistanceM,
         orbitalPeriod: period,
         parentId: star.id,
+        albedo,
+        equilibriumTemperature,
+        insolationFlux,
+        insolationRelative,
+        habitabilityStatus,
       },
     }));
   }

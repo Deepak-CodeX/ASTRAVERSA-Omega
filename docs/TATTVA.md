@@ -445,13 +445,79 @@ Stars and remnants are classified on the two-dimensional Morgan-Keenan (MK) syst
 
 ---
 
-## Planetary Model
+## Planetary Model & Stellar–Planetary Coupling (Mission 004B)
 
-### Current Implementation
+### Orbital Placement & Types
 
-**Orbital Placement:** Titius-Bode-like geometric progression.
-**Planet Types:** Rocky (<2 AU), Gas Giant (2–10 AU), Ice Giant (>10 AU).
-**Orbital Velocity:** Circular orbit: `v = √(G × M_star / r)`
+- **Orbital Placement:** Titius-Bode-like geometric progression ($d(n) = d_0 \cdot f^n \pm 10\%$).
+- **Planet Types:**
+  - Rocky (< 2 AU): $0.1 - 5 M_\oplus$, $0.4 - 1.6 R_\oplus$, nominal Bond albedo $A \approx 0.12 - 0.36$ (canonical default $0.30$).
+  - Gas Giant (2–10 AU): $50 - 4000 M_\oplus$, $6 - 15 R_\oplus$, nominal Bond albedo $A \approx 0.35 - 0.52$ (canonical default $0.45$).
+  - Ice Giant (> 10 AU): $10 - 50 M_\oplus$, $3 - 6 R_\oplus$, nominal Bond albedo $A \approx 0.28 - 0.38$ (canonical default $0.35$).
+- **Orbital Velocity:** Circular orbit approximation: $v = \sqrt{G M_\star / r}$.
+- **Orbital Period:** $T = 2\pi \sqrt{r^3 / (G M_\star)}$.
+
+---
+
+### Planetary Radiative-Equilibrium Temperature ($T_{\mathrm{eq}}$)
+
+For a spherical planet orbiting at distance $d$ (meters) from a star of bolometric luminosity $L_\star$ (Watts) with planetary Bond albedo $A \in [0, 1)$:
+
+$$T_{\mathrm{eq}} = \left( \frac{L_\star (1 - A)}{16\pi\sigma d^2} \right)^{1/4}$$
+
+where:
+- $\sigma = 5.670374419 \times 10^{-8}\text{ W m}^{-2}\text{ K}^{-4}$ (Stefan–Boltzmann constant).
+- Incident stellar flux (insolation) at distance $d$ is:
+  $$S = \frac{L_\star}{4\pi d^2}\quad [\text{W/m}^2]$$
+- Relative insolation $S / S_0$, normalized to present-day Earth solar flux ($S_0 \approx 1361.2\text{ W/m}^2$).
+
+**Reference Earth–Sun System:**
+- $L_\odot = 3.828 \times 10^{26}\text{ W}$, $d = 1\text{ AU} = 1.495978707 \times 10^{11}\text{ m}$, $A = 0.30$.
+- $T_{\mathrm{eq}} \approx 254.59\text{ K} \approx -18.56^\circ\text{C}$ (or $254.04\text{ K}$ with NASA empirical albedo $A = 0.306$).
+- Earth's observed mean surface temperature is $\sim 288.15\text{ K} \approx +15.0^\circ\text{C}$, indicating $\approx +33.6\text{ K}$ of natural greenhouse warming.
+
+**Scientific Assumptions & Model Constraints:**
+1. **Global Heat Redistribution ($4\pi$ factor):** Absorbed stellar energy ($P_{\text{abs}} = \pi R_p^2 (1 - A) S$) is assumed to be uniformly redistributed and reradiated over the planet's entire surface ($4\pi R_p^2$). This models rapid planetary rotation or efficient atmospheric/oceanic heat circulation.
+2. **Blackbody Emission ($\epsilon = 1$):** Planet emits as an ideal blackbody without wavelength-dependent spectral emissivity variations.
+3. **Absence of Explicit Greenhouse Model:** $T_{\mathrm{eq}}$ reflects purely bare-rock / radiative balance. It does NOT compute atmospheric greenhouse gas absorption ($\text{H}_2\text{O}, \text{CO}_2, \text{CH}_4$), cloud radiative forcing, lapse rates, or greenhouse warming.
+4. **Negligible Internal Heat:** Geothermal, radiogenic, and tidal heating are neglected relative to stellar irradiation.
+
+---
+
+### Circumstellar Habitable Zone (HZ) — Kopparapu et al. (2013, 2014)
+
+ASTRAVERSA Ω computes circumstellar habitable-zone boundaries using the authoritative 1D cloud-free radiative-convective climate model of Kopparapu et al. (2013, 2014):
+
+$$S_{\mathrm{eff}} = S_{\mathrm{eff}\odot} + a T_* + b T_*^2 + c T_*^3 + d T_*^4$$
+
+where $T_* = T_{\mathrm{eff}} - 5780\text{ K}$ and $T_{\mathrm{eff}}$ is stellar effective temperature.
+
+Orbital distance for each boundary is:
+$$d = \left( \frac{L_\star / L_\odot}{S_{\mathrm{eff}}} \right)^{0.5}\quad [\text{AU}]$$
+
+**Boundary Definitions & Coefficients (1 Earth-Mass Planet):**
+1. **Recent Venus (Optimistic Inner Edge, $S_{\mathrm{eff}\odot} = 1.776$):** Empirical limit based on geological evidence of when Venus may have lost liquid water.
+2. **Runaway Greenhouse (Conservative Inner Edge, $S_{\mathrm{eff}\odot} = 1.056$):** Theoretical limit where stellar flux exceeds the net outgoing infrared radiation limit (Simpson-Nakajima limit), driving total ocean evaporation.
+3. **Maximum Greenhouse (Conservative Outer Edge, $S_{\mathrm{eff}\odot} = 0.356$):** Theoretical limit where adding $\text{CO}_2$ produces cooling rather than warming due to Rayleigh scattering and $\text{CO}_2$ cloud condensation.
+4. **Early Mars (Optimistic Outer Edge, $S_{\mathrm{eff}\odot} = 0.320$):** Empirical limit based on geological valley networks and river channels on Mars $\sim 3.8\text{ Gyr}$ ago when solar luminosity was $\sim 75\%$ of present.
+
+**Solar-Twin ($T_{\mathrm{eff}} = 5780\text{ K}, 1.0 L_\odot$) Boundaries:**
+- Optimistic Habitable Zone: $[0.750\text{ AU}, 1.768\text{ AU}]$
+- Conservative Habitable Zone: $[0.973\text{ AU}, 1.676\text{ AU}]$ (Earth at 1.0 AU is inside)
+
+**Model Validity & Clamping:**
+- The Kopparapu polynomial was derived for main-sequence dwarf stars with $2600\text{ K} \le T_{\mathrm{eff}} \le 7200\text{ K}$ (M0V to F0V).
+- For hot evolved stars ($T_{\mathrm{eff}} > 7200\text{ K}$) or cool stellar remnants ($T_{\mathrm{eff}} < 2600\text{ K}$), $T_{\mathrm{eff}}$ is clamped to the validity boundary when evaluating $S_{\mathrm{eff}}$ to prevent 4th-order polynomial runaway divergence, while retaining the true bolometric stellar luminosity.
+- Zero-luminosity compact remnants return zero-radius boundaries.
+
+**Dynamic Stellar Evolution Coupling:**
+- As a star evolves over its lifetime, its luminosity and temperature change according to the Mission 004 stellar evolution model.
+- The engine dynamically recalculates the circumstellar habitable zone and each orbiting planet's radiative equilibrium temperature.
+- In the Red Giant Branch (RGB) phase, the habitable zone expands outwards to $5 - 30\text{ AU}$; in the White Dwarf cooling phase, it contracts inward to $< 0.3\text{ AU}$.
+
+**Critical Model Disclaimer:**
+> [!IMPORTANT]
+> Circumstellar habitable-zone boundaries represent **approximate 1D radiative climate model thresholds**, NOT proof of planetary habitability, surface liquid water, or life. True habitability depends on planetary volatile inventory, atmospheric composition and mass, magnetic fields, plate tectonics, tidal locking, orbital eccentricity, and stellar flare activity.
 
 ---
 

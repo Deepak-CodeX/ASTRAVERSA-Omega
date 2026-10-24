@@ -1201,6 +1201,26 @@ function SystemStarInfo({
       <InfoRow label="TEMPERATURE" value={`${formatNumber(sp?.temperature ?? 0, 0)} K`} />
       <InfoRow label="LUMINOSITY" value={`${formatNumber((sp?.luminosity ?? 0) / 3.828e26)} L☉`} />
 
+      {sp?.habitableZone && (
+        <>
+          <Divider />
+          <div style={styles.sectionHeader}>CIRCUMSTELLAR HABITABLE ZONE</div>
+          <InfoRow
+            label="CONSERVATIVE HZ"
+            value={`${sp.habitableZone.innerConservativeAU.toFixed(2)} – ${sp.habitableZone.outerConservativeAU.toFixed(2)} AU`}
+          />
+          <InfoRow
+            label="OPTIMISTIC HZ"
+            value={`${sp.habitableZone.innerOptimisticAU.toFixed(2)} – ${sp.habitableZone.outerOptimisticAU.toFixed(2)} AU`}
+          />
+          {sp.habitableZone.isTemperatureClamped && (
+            <div style={styles.disclaimerText}>
+              * Star Teff clamped to Kopparapu validity [2,600–7,200 K]
+            </div>
+          )}
+        </>
+      )}
+
       {evo && onAdvanceAge && (
         <>
           <Divider />
@@ -1255,6 +1275,30 @@ function SystemPlanetInfo({ body }: { body: CelestialBody }) {
   const periodDays = (pp?.orbitalPeriod ?? 0) / SECONDS_PER_DAY;
   const periodYears = (pp?.orbitalPeriod ?? 0) / SECONDS_PER_YEAR;
 
+  const habitabilityColor =
+    pp?.habitabilityStatus === 'CONSERVATIVE_HZ'
+      ? '#10b981'
+      : pp?.habitabilityStatus === 'OPTIMISTIC_INNER'
+      ? '#06b6d4'
+      : pp?.habitabilityStatus === 'OPTIMISTIC_OUTER'
+      ? '#38bdf8'
+      : pp?.habitabilityStatus === 'TOO_HOT'
+      ? '#f59e0b'
+      : '#94a3b8';
+
+  const habitabilityLabel =
+    pp?.habitabilityStatus === 'CONSERVATIVE_HZ'
+      ? 'CONSERVATIVE HZ'
+      : pp?.habitabilityStatus === 'OPTIMISTIC_INNER'
+      ? 'OPTIMISTIC INNER'
+      : pp?.habitabilityStatus === 'OPTIMISTIC_OUTER'
+      ? 'OPTIMISTIC OUTER'
+      : pp?.habitabilityStatus === 'TOO_HOT'
+      ? 'TOO HOT'
+      : pp?.habitabilityStatus === 'TOO_COLD'
+      ? 'TOO COLD'
+      : 'UNKNOWN';
+
   return (
     <>
       <InfoRow label="TYPE" value={pp?.planetType ?? 'Unknown'} />
@@ -1269,6 +1313,51 @@ function SystemPlanetInfo({ body }: { body: CelestialBody }) {
         label="VELOCITY"
         value={`${formatNumber(Math.sqrt(body.velocity.x ** 2 + body.velocity.y ** 2 + body.velocity.z ** 2) / 1000)} km/s`}
       />
+
+      {pp && pp.equilibriumTemperature !== undefined && (
+        <>
+          <Divider />
+          <div style={styles.sectionHeader}>STELLAR–PLANETARY COUPLING</div>
+          <InfoRow
+            label="EQUILIBRIUM TEMP"
+            value={`${formatNumber(pp.equilibriumTemperature, 1)} K (${formatNumber(pp.equilibriumTemperature - 273.15, 1)} °C)`}
+          />
+          <InfoRow label="BOND ALBEDO" value={pp.albedo.toFixed(2)} />
+          <InfoRow
+            label="STELLAR FLUX"
+            value={`${formatNumber(pp.insolationFlux, 1)} W/m² (${pp.insolationRelative.toFixed(2)} S⊕)`}
+          />
+          <div style={styles.hzStatusRow}>
+            <span style={styles.label}>HABITABILITY</span>
+            <span
+              style={{
+                ...styles.hzBadge,
+                color: habitabilityColor,
+                borderColor: habitabilityColor,
+                backgroundColor: `${habitabilityColor}18`,
+              }}
+            >
+              {habitabilityLabel}
+            </span>
+          </div>
+
+          <div style={styles.disclaimerBox}>
+            <div style={styles.disclaimerTitle}>MODEL ASSUMPTIONS & LIMITATIONS</div>
+            <div style={styles.disclaimerText}>
+              • Radiative equilibrium (Teq) assumes uniform 4π global heat redistribution and blackbody emission (ε = 1).
+            </div>
+            <div style={styles.disclaimerText}>
+              • Excludes greenhouse warming (+33.7 K on Earth) and atmospheric fluid dynamics.
+            </div>
+            <div style={styles.disclaimerText}>
+              • Habitable zone computed via Kopparapu et al. (2013) 1D climate model.
+            </div>
+            <div style={styles.disclaimerText}>
+              • Represents approximate radiative climate boundaries, not definitive evidence of habitability.
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }
@@ -2121,5 +2210,51 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontFamily: "'JetBrains Mono', monospace",
     transition: 'all 0.15s ease',
+  },
+  sectionHeader: {
+    fontSize: 9,
+    letterSpacing: 1.5,
+    color: '#38bdf8',
+    textTransform: 'uppercase' as const,
+    fontFamily: "'JetBrains Mono', monospace",
+  },
+  hzStatusRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '3px 0',
+  },
+  hzBadge: {
+    fontSize: 8.5,
+    fontWeight: 600,
+    letterSpacing: 0.8,
+    fontFamily: "'JetBrains Mono', monospace",
+    padding: '2px 7px',
+    borderRadius: 4,
+    border: '1px solid currentColor',
+  },
+  disclaimerBox: {
+    marginTop: 8,
+    padding: '8px 10px',
+    background: 'rgba(15, 23, 42, 0.65)',
+    border: '1px solid rgba(148, 163, 184, 0.15)',
+    borderRadius: 6,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 4,
+  },
+  disclaimerTitle: {
+    fontSize: 7.5,
+    letterSpacing: 1,
+    fontWeight: 600,
+    color: '#38bdf8',
+    fontFamily: "'JetBrains Mono', monospace",
+    marginBottom: 2,
+  },
+  disclaimerText: {
+    fontSize: 7.5,
+    color: '#94a3b8',
+    lineHeight: 1.35,
+    fontFamily: "'Inter', sans-serif",
   },
 };

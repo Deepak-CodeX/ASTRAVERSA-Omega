@@ -94,7 +94,7 @@ Each subsystem — physics, astronomy, geology, biology — must be independentl
 
 The user opens ASTRAVERSA Ω and sees a spiral galaxy filling the viewport. The galactic core glows subtly. Spiral arms sweep through space, dense with stars. The camera slowly orbits, inviting interaction.
 
-They click a star. Its properties appear: spectral class, mass, temperature, luminosity. They press "Enter Star System" and are transported into a solar system. A star burns at the center. Planets trace their orbits. Time flows — slowly or fast, at the user's command.
+They click a star. Its properties appear: spectral class, mass, temperature, luminosity, and circumstellar habitable zone. They press "Enter Star System" and are transported into a solar system. A star burns at the center. Planets trace their orbits. Time flows — slowly or fast, at the user's command. They click a planet to inspect its radiative-equilibrium temperature ($T_{\text{eq}}$), Bond albedo, incident stellar flux, and habitable-zone classification, watching how stellar evolution dynamically transforms planetary thermal regimes over billions of years.
 
 They press "Back to Galaxy" and return to the galactic view, the same star still highlighted. They pick another. A different solar system unfolds. Each one unique, each one deterministic, each one governed by the same physical laws.
 

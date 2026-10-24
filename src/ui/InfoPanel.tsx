@@ -75,6 +75,12 @@ function StarInfo({ body }: { body: CelestialBody }) {
       <InfoRow label="Radius" value={`${(body.radius / SOLAR_RADIUS).toFixed(3)} R☉`} />
       <InfoRow label="Temperature" value={`${formatNumber(sp?.temperature ?? 0, 0)} K`} />
       <InfoRow label="Luminosity" value={`${formatNumber((sp?.luminosity ?? 0) / 3.828e26)} L☉`} />
+      {sp?.habitableZone && (
+        <InfoRow
+          label="Habitable Zone"
+          value={`${sp.habitableZone.innerConservativeAU.toFixed(2)} – ${sp.habitableZone.outerConservativeAU.toFixed(2)} AU`}
+        />
+      )}
     </>
   );
 }
@@ -104,6 +110,33 @@ function PlanetInfo({ body }: { body: CelestialBody }) {
           body.velocity.x ** 2 + body.velocity.y ** 2 + body.velocity.z ** 2
         ) / 1000)} km/s`}
       />
+      {pp && pp.equilibriumTemperature !== undefined && (
+        <>
+          <InfoRow
+            label="Equilibrium Temp"
+            value={`${pp.equilibriumTemperature.toFixed(1)} K (${(pp.equilibriumTemperature - 273.15).toFixed(1)} °C)`}
+          />
+          <InfoRow label="Bond Albedo" value={pp.albedo.toFixed(2)} />
+          <InfoRow
+            label="Insolation"
+            value={`${pp.insolationRelative.toFixed(2)} S⊕`}
+          />
+          <InfoRow
+            label="Habitability"
+            value={
+              pp.habitabilityStatus === 'CONSERVATIVE_HZ'
+                ? 'Conservative HZ'
+                : pp.habitabilityStatus === 'OPTIMISTIC_INNER'
+                ? 'Optimistic Inner'
+                : pp.habitabilityStatus === 'OPTIMISTIC_OUTER'
+                ? 'Optimistic Outer'
+                : pp.habitabilityStatus === 'TOO_HOT'
+                ? 'Too Hot'
+                : 'Too Cold'
+            }
+          />
+        </>
+      )}
     </>
   );
 }
