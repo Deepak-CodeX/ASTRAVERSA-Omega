@@ -87,7 +87,9 @@ Galaxy (ANANTARA α — 500k ly main stellar-body disk, 750k ly halo)
 | `constants` | Physical constants (G, AU, kpc, solar mass, Stefan-Boltzmann $\sigma$, etc.) and unit conversions |
 | `stellar` | Main-sequence stellar classification and property derivation |
 | `stellarEvolution` | Piecewise stellar lifecycles, $\tau_{\text{MS}}$ scaling, Hayashi convective limit, Mestel cooling, and compact remnant endpoints |
+| `stellarPlanetaryCoupling` | Radiative-equilibrium temperature, insolation flux, and Kopparapu et al. (2013) habitable zone |
 | `planetary` | Planetary type classification and orbital mechanics |
+| `planetaryEnvironment` | Surface gravity, escape velocity, atmospheric retention, 1D semi-grey greenhouse surface temperature, Clausius-Clapeyron water boiling curves, and physical thermal regimes (Mission 005A) |
 
 **Dependencies:** None (pure data and functions)
 
@@ -286,6 +288,38 @@ Stellar Evolution Model (L_star, T_eff)
    - Stellar age advances during simulation time (`advanceStellarAge`).
    - The user interactively steps the stellar age timeline (+500 Myr, +1.0 Gyr, +2.5 Gyr, or reset to ZAMS) via `setStarAge`.
 3. **Decoupled Inspector Presentation:** UI inspectors (`UnifiedInfoPanel`, `SystemPlanetInfo`, `SystemStarInfo`, and `InfoPanel`) display values directly from authoritative body properties without duplicating state or recomputing physics.
+
+---
+
+## Planetary Environments Architecture (Mission 005A)
+
+### Environmental Pipeline & Data Flow
+
+```
+Planetary Physical State (M, R) + Stellar Insolation (L_star, d, A)
+  │
+  ├──> computeSurfaceGravity(M, R) -> g (m/s²), g_rel (Earth = 1.0)
+  ├──> computeEscapeVelocity(M, R) -> v_esc (km/s)
+  ├──> isAtmosphereRetainedByGravity(v_esc) [Jeans escape threshold: v_esc >= 3.0 km/s]
+  │
+  ├──> Atmospheric Pressure (P_surf)
+  │      └──> Airless (0 bar) if v_esc < 3.0 km/s
+  │      └──> Parameterized volatile envelope for terrestrial / giant planets
+  │
+  ├──> 1D Semi-Grey Greenhouse Model:
+  │      ├──> computeInfraredOpticalDepth(P_surf) -> τ_IR = τ_0 * (P/P_0)^0.5
+  │      └──> computeSurfaceTemperature(T_eq, P_surf) -> T_surf = T_eq * (1 + 0.75 * τ_IR)^0.25
+  │      └──> greenhouseWarmingK = T_surf - T_eq
+  │
+  ├──> Thermodynamic Water Phase State:
+  │      ├──> computeWaterBoilingPoint(P_surf) via Clausius-Clapeyron relation
+  │      └──> evaluateWaterPhaseState(T_surf, P_surf) -> Sublimating / Ice / Liquid / Steam
+  │
+  └──> Physical Thermal & Environmental Regime:
+         └──> classifyThermalRegime(type, P_surf, T_surf, waterPhase)
+                -> Airless Cryoworld | Airless Desolation | Glaciated Terrestrial
+                   | Temperate Model Regime | Hyperthermic Runaway | Jovian Giant
+```
 
 ---
 

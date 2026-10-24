@@ -18,6 +18,7 @@ import type {
   HabitableZoneBoundaries,
   HabitabilityStatus,
 } from '../astronomy/stellarPlanetaryCoupling';
+import type { PlanetaryEnvironment } from '../astronomy/planetaryEnvironment';
 
 /**
  * Types of celestial bodies.
@@ -62,6 +63,10 @@ export interface PlanetProperties {
   insolationRelative: number;
   /** Circumstellar habitable zone classification based on Kopparapu et al. (2013) */
   habitabilityStatus: HabitabilityStatus;
+
+  // Planetary Environment (Mission 005A)
+  /** Planetary surface environment, atmosphere, and thermal regime */
+  environment?: PlanetaryEnvironment;
 }
 
 /**

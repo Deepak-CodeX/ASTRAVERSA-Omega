@@ -521,6 +521,58 @@ $$d = \left( \frac{L_\star / L_\odot}{S_{\mathrm{eff}}} \right)^{0.5}\quad [\tex
 
 ---
 
+## Planetary Environments & Thermal Regimes (Mission 005A)
+
+### Scientific Scope and Physical Principles
+
+Mission 005A introduces **authoritative planetary surface physics, atmospheric retention criteria, 1D greenhouse warming, and thermodynamic phase regimes** to complement the orbital mechanics and stellar-evolution radiative coupling.
+
+### 1. Planetary Gravitational Primitives
+For a planet of mass $M_p$ and mean radius $R_p$:
+- **Surface Gravity:**
+  $$g = \frac{G M_p}{R_p^2}\quad [\text{m/s}^2], \qquad g_{\mathrm{rel}} = \frac{g}{g_\oplus}$$
+  where $g_\oplus \approx 9.82\text{ m/s}^2$.
+- **Surface Escape Velocity:**
+  $$v_{\mathrm{esc}} = \sqrt{\frac{2 G M_p}{R_p}}\quad [\text{m/s}] = \sqrt{\frac{2 G M_p}{R_p}} \times 10^{-3}\quad [\text{km/s}]$$
+
+### 2. Atmospheric Retention (Thermal Jeans Escape Boundary)
+A celestial body can retain heavy volatile gases ($\text{N}_2, \text{O}_2, \text{CO}_2, \text{H}_2\text{O}$) over geological timescales ($\sim 4.5\text{ Gyr}$) against thermal Jeans escape and stellar wind stripping if its escape velocity exceeds the classical empirical threshold:
+$$v_{\mathrm{esc}} \ge 3.0\text{ km/s}$$
+- Bodies below $3.0\text{ km/s}$ (e.g. Moon $2.38\text{ km/s}$, Mercury $4.25\text{ km/s}$ under intense daytime stellar wind) cannot sustain stable volatile envelopes, yielding near-vacuum surfaces ($P_{\mathrm{surf}} \approx 0\text{ bar}$).
+- Terrestrial bodies above $3.0\text{ km/s}$ retain atmospheric envelopes with surface pressures parameterized between $0.001\text{ bar}$ and $100\text{ bar}$.
+- Gas and ice giants are modeled as deep gaseous envelopes with a standard $1.0\text{ bar}$ tropospheric reference level.
+
+### 3. 1D Semi-Grey Atmospheric Greenhouse Model
+Bare-rock radiative-equilibrium temperature $T_{\mathrm{eq}}$ is distinguished from actual surface temperature $T_{\mathrm{surf}}$ via plane-parallel semi-grey radiative equilibrium (Pierrehumbert 2010):
+$$T_{\mathrm{surf}} = T_{\mathrm{eq}} \times \left( 1 + \frac{3}{4}\tau_{\mathrm{IR}} \right)^{1/4}$$
+where effective thermal infrared optical depth scales with surface pressure via collision-induced pressure broadening:
+$$\tau_{\mathrm{IR}} = \tau_0 \times \left( \frac{P_{\mathrm{surf}}}{P_0} \right)^{0.5}$$
+with $\tau_0 \approx 0.842$ and $P_0 = 1.01325\text{ bar}$.
+- **Airless Worlds ($P = 0$):** $\tau_{\mathrm{IR}} = 0 \implies T_{\mathrm{surf}} \equiv T_{\mathrm{eq}}$ (direct radiative balance with space).
+- **Earth Analogue:** $P = 1.01325\text{ bar}, T_{\mathrm{eq}} \approx 255.0\text{ K} \implies \tau_{\mathrm{IR}} \approx 0.842 \implies T_{\mathrm{surf}} \approx 288.2\text{ K}$ ($\Delta T_{\mathrm{gh}} \approx +33.2\text{ K}$ natural greenhouse warming).
+- **Mars Analogue:** $P \approx 0.006\text{ bar} \implies \tau_{\mathrm{IR}} \approx 0.065 \implies \Delta T_{\mathrm{gh}} \approx +2.5\text{ K}$.
+- **Venus Analogue:** Dense greenhouse runaway ($P \sim 90\text{ bar}$) drives massive thermal trapping ($\Delta T_{\mathrm{gh}} > 100\text{ K}$).
+
+### 4. Thermodynamic Water Phase Stability
+Liquid water stability is evaluated against the water triple point ($T_{\mathrm{triple}} = 273.16\text{ K}, P_{\mathrm{triple}} = 6.117\text{ mbar}$) and the integrated Clausius-Clapeyron boiling curve:
+$$\frac{1}{T_{\mathrm{boil}}} = \frac{1}{T_0} - \frac{R}{\Delta H_{\mathrm{vap}}} \ln\left( \frac{P_{\mathrm{surf}}}{P_0} \right)$$
+- Below $P_{\mathrm{triple}}$ ($< 6.12\text{ mbar}$): Liquid water cannot exist in equilibrium; ice sublimates directly to vapor (`SUBLIMATING_ICE`).
+- At $P \ge P_{\mathrm{triple}}$ and $T_{\mathrm{surf}} < 273.15\text{ K}$: Solid water ice (`SOLID_ICE`).
+- At $P \ge P_{\mathrm{triple}}$ and $273.15\text{ K} \le T_{\mathrm{surf}} \le T_{\mathrm{boil}}(P)$: Liquid water thermodynamically stable on solid surface (`LIQUID_STABLE`).
+- At $T_{\mathrm{surf}} > T_{\mathrm{boil}}(P)$: Superheated steam runaway / ocean boiling (`SUPERHEATED_STEAM`).
+
+### 5. Physical Thermal Regimes
+Planets are classified into descriptive physical categories without equating them to biological habitability:
+- `AIRLESS_CRYOWORLD`: Airless body ($P \approx 0$), $T_{\mathrm{surf}} < 273.15\text{ K}$ (e.g. Pluto, frozen satellites).
+- `AIRLESS_DESOLATION`: Airless body ($P \approx 0$), $T_{\mathrm{surf}} \ge 273.15\text{ K}$ (e.g. Moon, Mercury).
+- `GLACIATED_TERRESTRIAL`: Atmosphere present, $T_{\mathrm{surf}} < 273.15\text{ K}$ (e.g. Snowball Earth, Mars-like cryosphere).
+- `TEMPERATE_MODEL_REGIME`: Atmosphere present, liquid water thermodynamically stable ($273.15\text{ K} \le T_{\mathrm{surf}} \le 373.15\text{ K}$ and $\le T_{\mathrm{boil}}$).
+- `HYPERTHERMIC_RUNAWAY`: Terrestrial planet with severe greenhouse runaway or extreme insolation ($T_{\mathrm{surf}} > 373.15\text{ K}$).
+- `JOVIAN_GAS_GIANT`: Gas giant ($H_2/\text{He}$ envelope).
+- `JOVIAN_ICE_GIANT`: Ice giant (volatile/methane envelope).
+
+---
+
 ## Scale Hierarchy
 
 | Scale | Represented Objects | Physics | Rendering |

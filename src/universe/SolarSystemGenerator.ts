@@ -33,6 +33,7 @@ import {
   classifyHabitability,
   sampleBondAlbedo,
 } from '../astronomy/stellarPlanetaryCoupling';
+import { computePlanetaryEnvironment } from '../astronomy/planetaryEnvironment';
 import {
   getPlanetType,
   getPlanetTypeData,
@@ -260,6 +261,18 @@ export function generateSolarSystem(seed: number): SolarSystem {
       habitableZone
     );
 
+    // Derived planetary environment using isolated child seed to preserve determinism (Mission 005A)
+    const envRng = new SeededRandom(planetRng.deriveSeed(999));
+    const environment = computePlanetaryEnvironment({
+      planetType,
+      massKg: mass,
+      radiusMeters: radius,
+      luminosityWatts: star.starProperties!.luminosity,
+      orbitalDistanceMeters: orbitalDistanceM,
+      albedo,
+      rng: envRng,
+    });
+
     planets.push(createCelestialBody({
       id: `planet-${seed}-${i}`,
       name: planetName,
@@ -280,6 +293,7 @@ export function generateSolarSystem(seed: number): SolarSystem {
         insolationFlux,
         insolationRelative,
         habitabilityStatus,
+        environment,
       },
     }));
   }

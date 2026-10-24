@@ -120,5 +120,45 @@ describe('SolarSystemGenerator', () => {
       const ids = new Set(system.bodies.map(b => b.id));
       expect(ids.size).toBe(system.bodies.length);
     });
+
+    it('all planets have authoritative planetary environment records (Mission 005A)', () => {
+      for (let seed = 0; seed < 10; seed++) {
+        const system = generateSolarSystem(seed);
+        for (const planet of system.planets) {
+          const env = planet.planetProperties?.environment;
+          expect(env).toBeDefined();
+          expect(env!.surfaceGravity).toBeGreaterThan(0);
+          expect(env!.relativeGravity).toBeGreaterThan(0);
+          expect(env!.escapeVelocityKmPerSec).toBeGreaterThan(0);
+          expect(env!.surfacePressureBar).toBeGreaterThanOrEqual(0);
+          expect(env!.surfaceTemperatureK).toBeGreaterThanOrEqual(env!.equilibriumTemperatureK);
+          expect(env!.thermalRegime).toBeDefined();
+          expect(env!.regimeLabel.length).toBeGreaterThan(0);
+          expect(env!.waterPhaseState).toBeDefined();
+        }
+      }
+    });
+
+    it('preserves exact byte-for-byte determinism of planetary orbits and properties', () => {
+      const sysA = generateSolarSystem(42);
+      const sysB = generateSolarSystem(42);
+
+      expect(sysA.planets.length).toBe(sysB.planets.length);
+      for (let i = 0; i < sysA.planets.length; i++) {
+        const pA = sysA.planets[i];
+        const pB = sysB.planets[i];
+        expect(pA.mass).toBe(pB.mass);
+        expect(pA.radius).toBe(pB.radius);
+        expect(pA.position.x).toBe(pB.position.x);
+        expect(pA.position.z).toBe(pB.position.z);
+        expect(pA.velocity.x).toBe(pB.velocity.x);
+        expect(pA.velocity.z).toBe(pB.velocity.z);
+        expect(pA.planetProperties!.albedo).toBe(pB.planetProperties!.albedo);
+        expect(pA.planetProperties!.equilibriumTemperature).toBe(pB.planetProperties!.equilibriumTemperature);
+        expect(pA.planetProperties!.environment!.surfaceTemperatureK).toBe(pB.planetProperties!.environment!.surfaceTemperatureK);
+        expect(pA.planetProperties!.environment!.surfacePressureBar).toBe(pB.planetProperties!.environment!.surfacePressureBar);
+        expect(pA.planetProperties!.environment!.thermalRegime).toBe(pB.planetProperties!.environment!.thermalRegime);
+      }
+    });
   });
 });

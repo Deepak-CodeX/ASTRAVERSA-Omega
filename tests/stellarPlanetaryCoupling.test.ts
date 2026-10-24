@@ -374,6 +374,24 @@ describe('Mission 004B — Stellar–Planetary Coupling', () => {
       expect(star.starProperties!.habitableZone!.innerConservativeAU).toBeCloseTo(zamsHz.innerConservativeAU, 6);
       expect(system.planets[0].planetProperties!.equilibriumTemperature).toBeCloseTo(zamsTemp, 4);
     });
+
+    it('dynamically updates planetary environment and surface temperatures when star age advances (Mission 005A)', () => {
+      const engine = new SimulationEngine();
+      const system = generateSolarSystem(42);
+      engine.initialize(system.bodies);
+
+      const star = system.star;
+      const planet0 = system.planets[0];
+      const initialSurfT = planet0.planetProperties!.environment!.surfaceTemperatureK;
+
+      // Advance star by 2 Gyr (main sequence luminosity increases)
+      engine.advanceStellarAge(2e9);
+
+      const updatedSurfT = planet0.planetProperties!.environment!.surfaceTemperatureK;
+      expect(updatedSurfT).toBeGreaterThan(initialSurfT);
+      expect(planet0.planetProperties!.environment).toBeDefined();
+      expect(planet0.planetProperties!.environment!.surfaceGravity).toBeGreaterThan(0);
+    });
   });
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

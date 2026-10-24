@@ -119,25 +119,47 @@ ASTRAVERSA Ω is developed through a series of **Missions** — focused mileston
 
 ---
 
-## 🚀 Mission 004B — STELLAR–PLANETARY COUPLING
+## ✅ Mission 004B — STELLAR–PLANETARY COUPLING
 ### "Radiative Equilibrium & Habitable Zones"
 
-**Status:** Completed (Ready for Acceptance)
+**Status:** ✅ Complete
 
-**Delivered:**
+**Deliverables:**
 - [x] Planetary radiative-equilibrium temperature ($T_{\mathrm{eq}} = ((L_\star (1 - A)) / (16\pi\sigma d^2))^{1/4}$) based on authoritative stellar luminosity, orbital distance, and Bond albedo.
 - [x] Circumstellar habitable zone model based on Kopparapu et al. (2013, 2014) 1D climate model parameterization (Recent Venus, Runaway Greenhouse, Maximum Greenhouse, Early Mars).
 - [x] Temperature validity clamping ($[2600, 7200]\text{ K}$) preventing 4th-order polynomial divergence for evolved blue stars or cool compact remnants.
 - [x] Dynamic coupling updating star habitable zone boundaries and planetary equilibrium temperatures/habitability statuses as simulation time flows or timeline is scrubbed.
 - [x] Deterministic PRNG isolation (`planetRng.deriveSeed(777)`) preserving 100% byte-for-byte planetary orbital and physical determinism.
 - [x] Sleek UI inspector integration (`SystemPlanetInfo`, `SystemStarInfo`, `InfoPanel`) with clear SI units, Celsius conversions, habitability status badges, and explicit scientific assumption/limitation disclaimers.
-- [x] Deterministic test suite (27 tests in `tests/stellarPlanetaryCoupling.test.ts`, 241 total test suite passing).
+- [x] Deterministic test suite (28 tests in `tests/stellarPlanetaryCoupling.test.ts`).
 - [x] Clean typecheck (`tsc -b`) and production build.
 
 ---
 
-## 🔮 Mission 005 — WORLDS UNVEILED
-### "Planetary Surfaces"
+## 🚀 Mission 005A — PLANETARY ENVIRONMENTS & THERMAL REGIMES
+### "Energy Balance, Atmospheric Retention & Thermal Regimes (First Vertical Slice)"
+
+**Status:** Completed (Ready for Acceptance)
+
+**Delivered:**
+- [x] Pure scientific module `src/astronomy/planetaryEnvironment.ts` with focused test suite `tests/planetaryEnvironment.test.ts` (31 tests).
+- [x] Surface gravitational acceleration ($g = G M / R^2$) and escape velocity ($v_{\mathrm{esc}} = \sqrt{2GM/R}$) primitives with strict unit tests.
+- [x] Thermal Jeans escape criterion ($v_{\mathrm{esc}} \ge 3.0\text{ km/s}$) for atmospheric volatile retention.
+- [x] Surface atmospheric pressure parameterization ($P_{\mathrm{surf}}$ in bar and Pa) with airless body distinction ($P = 0$).
+- [x] 1D semi-grey plane-parallel radiative equilibrium surface temperature ($T_{\mathrm{surf}} = T_{\mathrm{eq}} (1 + \frac{3}{4}\tau_{\mathrm{IR}})^{1/4}$), clearly distinguished from bare-rock $T_{\mathrm{eq}}$.
+- [x] Pressure-broadened infrared optical depth scaling ($\tau_{\mathrm{IR}} \propto P^{0.5}$), reproducing Earth's natural greenhouse warming ($\Delta T \approx +33.2\text{ K}$) and Venus/Mars analogues.
+- [x] Clausius-Clapeyron water boiling curve and triple-point sublimation threshold ($6.12\text{ mbar}$).
+- [x] Physical thermal regimes taxonomy (`AIRLESS_CRYOWORLD`, `AIRLESS_DESOLATION`, `GLACIATED_TERRESTRIAL`, `TEMPERATE_MODEL_REGIME`, `HYPERTHERMIC_RUNAWAY`, `JOVIAN_GAS_GIANT`, `JOVIAN_ICE_GIANT`).
+- [x] Deterministic PRNG isolation (`planetRng.deriveSeed(999)`) in `SolarSystemGenerator.ts` preserving 100% byte-for-byte planetary orbital determinism.
+- [x] Dynamic simulation engine synchronization in `SimulationEngine.ts` updating surface temperatures and thermal regimes as stellar luminosity evolves.
+- [x] UI inspector integration in `InfoPanel.tsx` and `GalaxyInfoPanel.tsx` with formatted parameters, thermal regime badges, and explicit scientific limitations disclaimers.
+- [x] Full test suite expanded to 16 test files, 275 tests passing (100% pass rate).
+- [x] Clean typecheck (`tsc -b`) and production build (`npm run build`).
+
+---
+
+## 🔮 Mission 005B — PLANETARY SURFACES & GEOLOGY
+### "Terrain, Crustal Dynamics & Surface Visualization"
 
 **Status:** Planned
 

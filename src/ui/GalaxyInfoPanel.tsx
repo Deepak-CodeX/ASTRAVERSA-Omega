@@ -1340,6 +1340,93 @@ function SystemPlanetInfo({ body }: { body: CelestialBody }) {
               {habitabilityLabel}
             </span>
           </div>
+        </>
+      )}
+
+      {pp?.environment && (
+        <>
+          <Divider />
+          <div style={styles.sectionHeader}>PLANETARY ENVIRONMENT (MISSION 005A)</div>
+          <InfoRow
+            label="SURFACE TEMP"
+            value={`${formatNumber(pp.environment.surfaceTemperatureK, 1)} K (${formatNumber(pp.environment.surfaceTemperatureK - 273.15, 1)} °C)`}
+          />
+          <InfoRow
+            label="GREENHOUSE ΔT"
+            value={`+${formatNumber(pp.environment.greenhouseWarmingK, 1)} K`}
+          />
+          <InfoRow
+            label="SURFACE GRAVITY"
+            value={`${pp.environment.surfaceGravity.toFixed(2)} m/s² (${pp.environment.relativeGravity.toFixed(2)} g)`}
+          />
+          <InfoRow
+            label="ESCAPE VELOCITY"
+            value={`${pp.environment.escapeVelocityKmPerSec.toFixed(2)} km/s`}
+          />
+          <InfoRow
+            label="SURFACE PRESSURE"
+            value={pp.environment.surfacePressureBar > 0 ? `${formatNumber(pp.environment.surfacePressureBar, 2)} bar` : 'Airless (0.00 bar)'}
+          />
+          <InfoRow
+            label="WATER STABILITY"
+            value={
+              pp.environment.waterPhaseState === 'LIQUID_STABLE'
+                ? 'Liquid Stable'
+                : pp.environment.waterPhaseState === 'SOLID_ICE'
+                ? 'Solid Glaciation'
+                : pp.environment.waterPhaseState === 'SUBLIMATING_ICE'
+                ? 'Sublimating Ice'
+                : pp.environment.waterPhaseState === 'SUPERHEATED_STEAM'
+                ? 'Superheated Steam'
+                : 'Not Applicable'
+            }
+          />
+          <div style={styles.hzStatusRow}>
+            <span style={styles.label}>THERMAL REGIME</span>
+            <span
+              style={{
+                ...styles.hzBadge,
+                color:
+                  pp.environment.thermalRegime === 'TEMPERATE_MODEL_REGIME'
+                    ? '#10b981'
+                    : pp.environment.thermalRegime === 'GLACIATED_TERRESTRIAL'
+                    ? '#38bdf8'
+                    : pp.environment.thermalRegime === 'AIRLESS_CRYOWORLD'
+                    ? '#818cf8'
+                    : pp.environment.thermalRegime === 'AIRLESS_DESOLATION'
+                    ? '#f59e0b'
+                    : pp.environment.thermalRegime === 'HYPERTHERMIC_RUNAWAY'
+                    ? '#ef4444'
+                    : '#a855f7',
+                borderColor:
+                  pp.environment.thermalRegime === 'TEMPERATE_MODEL_REGIME'
+                    ? '#10b981'
+                    : pp.environment.thermalRegime === 'GLACIATED_TERRESTRIAL'
+                    ? '#38bdf8'
+                    : pp.environment.thermalRegime === 'AIRLESS_CRYOWORLD'
+                    ? '#818cf8'
+                    : pp.environment.thermalRegime === 'AIRLESS_DESOLATION'
+                    ? '#f59e0b'
+                    : pp.environment.thermalRegime === 'HYPERTHERMIC_RUNAWAY'
+                    ? '#ef4444'
+                    : '#a855f7',
+                backgroundColor:
+                  pp.environment.thermalRegime === 'TEMPERATE_MODEL_REGIME'
+                    ? '#10b98118'
+                    : pp.environment.thermalRegime === 'GLACIATED_TERRESTRIAL'
+                    ? '#38bdf818'
+                    : pp.environment.thermalRegime === 'AIRLESS_CRYOWORLD'
+                    ? '#818cf818'
+                    : pp.environment.thermalRegime === 'AIRLESS_DESOLATION'
+                    ? '#f59e0b18'
+                    : pp.environment.thermalRegime === 'HYPERTHERMIC_RUNAWAY'
+                    ? '#ef444418'
+                    : '#a855f718',
+              }}
+            >
+              {pp.environment.regimeLabel.toUpperCase()}
+            </span>
+          </div>
 
           <div style={styles.disclaimerBox}>
             <div style={styles.disclaimerTitle}>MODEL ASSUMPTIONS & LIMITATIONS</div>
@@ -1347,13 +1434,13 @@ function SystemPlanetInfo({ body }: { body: CelestialBody }) {
               • Radiative equilibrium (Teq) assumes uniform 4π global heat redistribution and blackbody emission (ε = 1).
             </div>
             <div style={styles.disclaimerText}>
-              • Excludes greenhouse warming (+33.7 K on Earth) and atmospheric fluid dynamics.
+              • Surface temperature (Tsurf) modeled via 1D semi-grey radiative equilibrium (τ_IR ∝ P^0.5).
             </div>
             <div style={styles.disclaimerText}>
-              • Habitable zone computed via Kopparapu et al. (2013) 1D climate model.
+              • Atmospheric retention governed by thermal Jeans escape (vesc ≥ 3.0 km/s).
             </div>
             <div style={styles.disclaimerText}>
-              • Represents approximate radiative climate boundaries, not definitive evidence of habitability.
+              • Thermal regimes and liquid water stability are approximate physical model states, NOT proof of habitability or life.
             </div>
           </div>
         </>

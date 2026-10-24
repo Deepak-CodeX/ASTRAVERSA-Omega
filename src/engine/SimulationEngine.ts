@@ -25,6 +25,7 @@ import {
   classifyHabitability,
   getDefaultBondAlbedo,
 } from '../astronomy/stellarPlanetaryCoupling';
+import { computePlanetaryEnvironment } from '../astronomy/planetaryEnvironment';
 
 /**
  * Simulation engine state.
@@ -188,6 +189,17 @@ export class SimulationEngine {
         pp.insolationFlux = computeInsolationFlux(luminosity, dist);
         pp.insolationRelative = computeRelativeInsolation(pp.insolationFlux);
         pp.habitabilityStatus = classifyHabitability(dist, hz);
+
+        // Dynamically update planetary surface environment and thermal regime (Mission 005A)
+        pp.environment = computePlanetaryEnvironment({
+          planetType: pp.planetType,
+          massKg: body.mass,
+          radiusMeters: body.radius,
+          luminosityWatts: luminosity,
+          orbitalDistanceMeters: dist,
+          albedo,
+          surfacePressureBar: pp.environment?.surfacePressureBar,
+        });
       }
     }
   }

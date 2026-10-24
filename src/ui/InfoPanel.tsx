@@ -137,6 +137,50 @@ function PlanetInfo({ body }: { body: CelestialBody }) {
           />
         </>
       )}
+
+      {pp?.environment && (
+        <>
+          <div style={styles.divider} />
+          <InfoRow
+            label="Surface Temp"
+            value={`${pp.environment.surfaceTemperatureK.toFixed(1)} K (${(pp.environment.surfaceTemperatureK - 273.15).toFixed(1)} °C)`}
+          />
+          <InfoRow
+            label="Greenhouse ΔT"
+            value={`+${pp.environment.greenhouseWarmingK.toFixed(1)} K`}
+          />
+          <InfoRow
+            label="Surface Gravity"
+            value={`${pp.environment.surfaceGravity.toFixed(2)} m/s² (${pp.environment.relativeGravity.toFixed(2)} g)`}
+          />
+          <InfoRow
+            label="Escape Velocity"
+            value={`${pp.environment.escapeVelocityKmPerSec.toFixed(2)} km/s`}
+          />
+          <InfoRow
+            label="Atmosphere"
+            value={pp.environment.surfacePressureBar > 0 ? `${pp.environment.surfacePressureBar.toFixed(2)} bar` : 'Airless (0.00 bar)'}
+          />
+          <InfoRow
+            label="Water Stability"
+            value={
+              pp.environment.waterPhaseState === 'LIQUID_STABLE'
+                ? 'Liquid Stable'
+                : pp.environment.waterPhaseState === 'SOLID_ICE'
+                ? 'Solid Ice'
+                : pp.environment.waterPhaseState === 'SUBLIMATING_ICE'
+                ? 'Sublimating Ice'
+                : pp.environment.waterPhaseState === 'SUPERHEATED_STEAM'
+                ? 'Superheated Steam'
+                : 'N/A'
+            }
+          />
+          <InfoRow
+            label="Thermal Regime"
+            value={pp.environment.regimeLabel}
+          />
+        </>
+      )}
     </>
   );
 }
