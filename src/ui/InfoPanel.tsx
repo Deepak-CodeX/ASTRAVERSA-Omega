@@ -32,11 +32,45 @@ function formatNumber(value: number, decimals: number = 2): string {
   return value.toFixed(decimals);
 }
 
+function formatStellarAge(years: number): string {
+  if (years >= 1e9) return `${(years / 1e9).toFixed(2)} Gyr`;
+  if (years >= 1e6) return `${(years / 1e6).toFixed(1)} Myr`;
+  if (years >= 1e3) return `${(years / 1e3).toFixed(0)} Kyr`;
+  return `${years.toFixed(0)} yr`;
+}
+
 function StarInfo({ body }: { body: CelestialBody }) {
   const sp = body.starProperties;
+  const evo = sp?.evolution;
+
   return (
     <>
-      <InfoRow label="Type" value={`${sp?.spectralClass ?? '?'}-type Star`} />
+      {evo ? (
+        <>
+          <InfoRow
+            label="Phase"
+            value={`${evo.phaseLabel}`}
+          />
+          <InfoRow
+            label="Class"
+            value={`${evo.spectralClass}${evo.luminosityClass}`}
+          />
+          <InfoRow
+            label="Age"
+            value={formatStellarAge(evo.ageYears)}
+          />
+          <InfoRow
+            label="MS Life"
+            value={formatStellarAge(evo.mainSequenceLifetimeYears)}
+          />
+          <InfoRow
+            label="Progress"
+            value={`${(evo.phaseProgress * 100).toFixed(1)}%`}
+          />
+        </>
+      ) : (
+        <InfoRow label="Type" value={`${sp?.spectralClass ?? '?'}-type Star`} />
+      )}
       <InfoRow label="Mass" value={`${(body.mass / SOLAR_MASS).toFixed(3)} M☉`} />
       <InfoRow label="Radius" value={`${(body.radius / SOLAR_RADIUS).toFixed(3)} R☉`} />
       <InfoRow label="Temperature" value={`${formatNumber(sp?.temperature ?? 0, 0)} K`} />

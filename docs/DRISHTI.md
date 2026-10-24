@@ -56,13 +56,15 @@ ASTRAVERSA Ω will eventually encompass multiple interconnected simulation layer
 
 ## Current Experience
 
-The user opens ASTRAVERSA Ω and beholds a **procedurally generated spiral galaxy** — a vast structure of tens of thousands of stars arranged in spiral arms, a luminous central bulge, and scattered field populations. The galaxy has genuine 3D depth, with dust-like nebular structure woven through the arms.
+The user opens ASTRAVERSA Ω and beholds a **procedurally generated spiral galaxy** (ANANTARA α) — a vast structure of tens of thousands of stars arranged in spiral arms, a luminous central bulge, leading bar shock lanes, and scattered halo populations. The galaxy has genuine 3D depth, with dust extinction lanes and starburst nurseries woven through the arms.
 
 The user can orbit around the galaxy, zoom in to inspect regions of interest, and select individual stars. Each selected star reveals its physical properties: mass, temperature, luminosity, spectral classification, and metallicity — all derived from the generation model, never fabricated.
 
-Upon selecting a star and choosing to enter its system, the user is transported into a **fully simulated solar system**. Planets orbit their parent star under Newtonian gravity, with the Velocity Verlet integrator ensuring stable long-term dynamics. Time can be accelerated from real-time to a million times faster.
+Upon selecting a star and choosing to enter its system, the user is transported into a **fully simulated solar system**. Planets orbit their parent star under Newtonian gravity, with the Velocity Verlet integrator ensuring stable long-term dynamics.
 
-This is the **galactic foundation** — the first gateway from solar system to galaxy and back again.
+The central star is **alive and evolving**. Stars are born at Zero-Age Main Sequence (ZAMS), steadily fuse hydrogen, expand into subgiants and red giants along convective Hayashi boundaries, and transition into degenerate white dwarf cooling remnants. Through the interactive Stellar Evolution Timeline, the observer can step through cosmic epochs (+500 Myr, +1.0 Gyr, +2.5 Gyr) or reset to ZAMS, watching physical radius, luminosity, surface temperature, spectral class, and visual glow adapt dynamically according to physical law.
+
+This is the **galactic and stellar foundation** — the gateway connecting cosmic structure, orbital mechanics, and stellar lifecycles.
 
 ---
 

@@ -13,8 +13,10 @@
 import { SimulationClock, type TimeMultiplier } from './SimulationClock';
 import { Vector3 } from '../physics/Vector3';
 import { computeGravitationalForce } from '../physics/gravity';
-import type { CelestialBody } from '../universe/CelestialBody';
-import { G } from '../astronomy/constants';
+import { CelestialBodyType, type CelestialBody } from '../universe/CelestialBody';
+import { G, secondsToYears } from '../astronomy/constants';
+import { computeStellarEvolution } from '../astronomy/stellarEvolution';
+import type { SpectralClass } from '../astronomy/stellar';
 
 /**
  * Simulation engine state.
@@ -96,9 +98,51 @@ export class SimulationEngine {
 
     const substeps = this.clock.tick(wallDeltaMs);
 
+    let totalDt = 0;
     for (const dt of substeps) {
       this.integrateStep(dt);
+      totalDt += dt;
     }
+
+    if (totalDt > 0) {
+      this.advanceStellarAge(secondsToYears(totalDt));
+    }
+  }
+
+  /**
+   * Advance the stellar age of all stars in the simulation by deltaYears,
+   * updating their physical parameters (mass, radius, luminosity, temperature, color, phase).
+   */
+  advanceStellarAge(deltaYears: number): void {
+    if (deltaYears <= 0) return;
+    for (const body of this._bodies) {
+      if (body.type === CelestialBodyType.STAR && body.starProperties?.evolution) {
+        const currentAge = body.starProperties.evolution.ageYears;
+        this.setStarAge(body, currentAge + deltaYears);
+      }
+    }
+  }
+
+  /**
+   * Set the exact stellar age of a star, recomputing its evolutionary state.
+   */
+  setStarAge(star: CelestialBody, newAgeYears: number): void {
+    if (!star.starProperties?.evolution) return;
+    const initialMassSolar = star.starProperties.evolution.initialMassSolar;
+    const metallicity = star.starProperties.evolution.metallicity;
+    const nextEvolution = computeStellarEvolution({
+      initialMassSolar,
+      ageYears: Math.max(0, newAgeYears),
+      metallicity,
+    });
+
+    star.mass = nextEvolution.currentMassKg;
+    star.radius = nextEvolution.radiusMeters;
+    star.color = nextEvolution.color;
+    star.starProperties.spectralClass = nextEvolution.spectralClass as SpectralClass;
+    star.starProperties.luminosity = nextEvolution.luminosityWatts;
+    star.starProperties.temperature = nextEvolution.effectiveTemperature;
+    star.starProperties.evolution = nextEvolution;
   }
 
   /**

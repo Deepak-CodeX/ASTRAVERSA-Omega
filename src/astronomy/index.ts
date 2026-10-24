@@ -5,3 +5,4 @@
 export * from './constants';
 export * from './stellar';
 export * from './planetary';
+export * from './stellarEvolution';

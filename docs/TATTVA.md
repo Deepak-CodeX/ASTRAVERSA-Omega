@@ -325,25 +325,123 @@ Universe Seed
 
 ---
 
-## Stellar Model
+## Stellar Model & Evolution (Mission 004)
 
-### Current Implementation: Simplified Main-Sequence Relations
+### Scientific Scope and Distinction from Research-Grade Hydrodynamics
 
-**Mass-Luminosity:** `L = L☉ × (M/M☉)^3.5`
-**Mass-Radius:** `R = R☉ × (M/M☉)^0.8`
-**Temperature:** `T ≈ T☉ × (M/M☉)^0.6`
+ASTRAVERSA Ω implements an **analytic piecewise stellar evolution model** inspired by the parametric fits of Hurley, Pols, & Tout (2000) and classical stellar structure theory (Iben 1967, Kippenhahn & Weigert). 
 
-### Spectral Classification
+> [!IMPORTANT]
+> **Educational Approximation Boundary:**
+> This model is an educational and interactive approximation. It does **not** solve 1D stellar interior differential equations (such as MESA or the Henyey method), does **not** compute dynamic nuclear reaction networks (p-p chains, CNO cycle, triple-alpha), and does **not** model hydrodynamic supernova shock breakouts or core-collapse convection. It provides deterministic, thermodynamically self-consistent trajectories across the Hertzsprung-Russell diagram for visual and architectural exploration.
 
-| Class | Mass Range (M☉) | Temp Range (K) | Color |
-| ------- | ----------------- | ---------------- | ------- |
-| O | 16 – 150 | 30,000 – 50,000 | Blue-white |
-| B | 2.1 – 16 | 10,000 – 30,000 | Blue-white |
-| A | 1.4 – 2.1 | 7,500 – 10,000 | White |
-| F | 1.04 – 1.4 | 6,000 – 7,500 | Yellow-white |
-| G | 0.8 – 1.04 | 5,200 – 6,000 | Yellow |
-| K | 0.45 – 0.8 | 3,700 – 5,200 | Orange |
-| M | 0.08 – 0.45 | 2,400 – 3,700 | Red |
+### Supported Parameter Range & Validity Limits
+
+- **Initial Mass Range:** $0.08 M_\odot \le M \le 120.0 M_\odot$
+  - Stars below $0.08 M_\odot$ are substellar brown dwarfs and do not initiate stable hydrogen fusion.
+  - Stars above $120 M_\odot$ are near the Eddington luminosity limit ($\Gamma \to 1$) and undergo extreme episodic mass loss (LBV phase).
+- **Metallicity ($Z$):** Relative to solar $Z_\odot \approx 0.0142$, typical range $0.0001 \le Z \le 0.04$.
+
+---
+
+### Zero-Age Main Sequence (ZAMS) Scaling
+
+At $t = 0$, base physical quantities scale according to standard homologous stellar structure relations:
+
+- **Mass-Luminosity Scaling:**
+  $$L_{\text{ZAMS}} = L_\odot \times \begin{cases}
+  0.23 \times (M/M_\odot)^{2.3} & M < 0.43 M_\odot \\
+  (M/M_\odot)^4 & 0.43 M_\odot \le M < 2.0 M_\odot \\
+  1.5 \times (M/M_\odot)^{3.5} & 2.0 M_\odot \le M < 20.0 M_\odot \\
+  3200 \times (M/M_\odot) & M \ge 20.0 M_\odot
+  \end{cases}$$
+- **Mass-Radius Scaling:**
+  $$R_{\text{ZAMS}} = R_\odot \times \begin{cases}
+  (M/M_\odot)^{0.8} & M < 1.0 M_\odot \\
+  (M/M_\odot)^{0.57} & M \ge 1.0 M_\odot
+  \end{cases}$$
+- **Stefan-Boltzmann Thermodynamic Consistency:**
+  To guarantee exact machine-level energy conservation without circular rounding, effective temperature is computed strictly via the Stefan-Boltzmann radiation law in SI units:
+  $$L = 4\pi R^2 \sigma T_{\text{eff}}^4 \implies T_{\text{eff}} = \left(\frac{L_{\text{Watts}}}{4\pi R_{\text{meters}}^2 \sigma}\right)^{1/4}$$
+  where $\sigma = 5.670374419 \times 10^{-8}\text{ W m}^{-2}\text{ K}^{-4}$.
+
+---
+
+### Main-Sequence Lifetime ($\tau_{\text{MS}}$)
+
+Core hydrogen-burning lifetime is determined by the total fusible core mass divided by nuclear energy generation rate ($E_{\text{nuc}} \propto M$, $L \propto M^{3.5}$):
+
+$$\tau_{\text{MS}} \approx 10^{10} \times \left(\frac{M}{M_\odot}\right)^{-2.5}\text{ yr}$$
+
+- **Low-Mass Convective Limit ($M \le 0.43 M_\odot$):** Red dwarfs are fully convective throughout their interiors, providing access to almost 100% of their hydrogen fuel. Their lifetime asymptotically approaches $1.2 \times 10^{12}\text{ yr}$ ($1.2\text{ trillion years}$).
+- **High-Mass Radiation Limit ($M \ge 30 M_\odot$):** Lifetime reaches an asymptotic nuclear burning floor of $\approx 3.0 \times 10^6\text{ yr}$ ($3\text{ Myr}$).
+
+---
+
+### Evolutionary Lifecycle Phases
+
+```
+Low / Intermediate Mass (M < 8 M☉):
+ZAMS → Main Sequence → Subgiant (IV) → Red Giant (III) → Core He-Burning (HB) → AGB → Planetary Nebula → White Dwarf (D VII)
+
+High Mass (8 M☉ ≤ M < 20 M☉):
+ZAMS → Main Sequence → Blue/Red Supergiant (I) → Supernova → Neutron Star (Pulsar)
+
+Very Massive (M ≥ 20 M☉):
+ZAMS → Main Sequence → Wolf-Rayet / Supergiant → Hypernova / Direct Collapse → Stellar Black Hole
+```
+
+1. **Main Sequence Phase ($0 \le t \le \tau_{\text{MS}}$):**
+   - Core hydrogen burning causes mean molecular weight $\mu$ to rise from $\sim 0.6$ to $\sim 1.3$.
+   - Luminosity swells by $30 - 80\%$ over MS lifetime: $L(t) = L_{\text{ZAMS}} \times (1 + 0.6 \cdot (t / \tau_{\text{MS}}))$.
+   - Radius expands by $15 - 40\%$: $R(t) = R_{\text{ZAMS}} \times (1 + 0.25 \cdot (t / \tau_{\text{MS}}))$.
+2. **Subgiant Phase ($1.0 \le t/\tau_{\text{MS}} \le 1.12$):**
+   - Hydrogen core is exhausted; core contracts gravitationally while burning continues in a shell surrounding the helium core (Schönberg-Chandrasekhar limit).
+   - Luminosity remains approximately flat while radius doubles and surface cools ($T_{\text{eff}} \approx 4200 - 5200\text{ K}$, Luminosity Class IV).
+3. **Red Giant Branch (RGB) & Hayashi Convective Limit ($1.12 \le t/\tau_{\text{MS}} \le 1.25$):**
+   - The expanding envelope becomes fully convective. Deep outer convection forces the star against the **Hayashi Track** boundary ($T_{\text{eff}} \approx 3100 - 3650\text{ K}$).
+   - Because temperature is constrained by convective envelope stability, ascending the giant branch drives massive radial expansion:
+     $$R_{\text{RGB}} = \sqrt{\frac{L_{\text{RGB}}}{4\pi \sigma T_{\text{Hayashi}}^4}} \sim 50 - 150 R_\odot$$
+   - Intermediate stars undergo the helium flash at the tip of the RGB.
+4. **Core Helium Burning / Horizontal Branch ($1.25 \le t/\tau_{\text{MS}} \le 1.33$):**
+   - Stable core helium burning ($3\alpha \to {}^{12}\text{C}$) in a non-degenerate core causes envelope contraction and modest heating ($T_{\text{eff}} \sim 4800 - 5800\text{ K}$, $R \sim 10 - 20 R_\odot$).
+5. **Asymptotic Giant Branch (AGB) ($1.33 \le t/\tau_{\text{MS}} \le 1.38$):**
+   - Concentric H- and He-burning shells surrounding degenerate C-O core. Thermal pulses and strong stellar winds (Mira-type mass loss) strip the hydrogen envelope.
+6. **Remnant Compact Endpoints ($t > 1.38 \tau_{\text{MS}}$):**
+   - **White Dwarf ($M_{\text{initial}} < 8 M_\odot$):**
+     - Core mass: $M_{\text{WD}} \approx 0.45 + 0.1 \times M_{\text{initial}}$, subject to the **Chandrasekhar Limit** ($M \le 1.44 M_\odot$).
+     - Radius governed by electron degeneracy pressure: $R_{\text{WD}} \approx 0.012 R_\odot \times (M_{\text{WD}}/0.6)^{-1/3}$.
+     - Thermal evolution governed by **Mestel's Cooling Law**: $L_{\text{WD}}(t) \propto t_{\text{cool}}^{-7/2}$.
+   - **Neutron Star ($8 M_\odot \le M_{\text{initial}} < 20 M_\odot$):**
+     - Remnant mass $1.4 - 2.1 M_\odot$, radius $\approx 12\text{ km}$, governed by neutron degeneracy up to the **Tolman-Oppenheimer-Volkoff (TOV) Limit** ($\sim 2.5 - 3.0 M_\odot$).
+   - **Stellar Black Hole ($M_{\text{initial}} \ge 20 M_\odot$):**
+     - Remnant mass $3 - 40 M_\odot$, radius characterized by the Schwarzschild event horizon $r_s = 2GM/c^2$.
+
+---
+
+### Spectral and Luminosity Classification
+
+Stars and remnants are classified on the two-dimensional Morgan-Keenan (MK) system:
+
+| Spectral Class | Effective Temperature ($T_{\text{eff}}$) | Canonical Color | Representative Phase |
+| :--- | :--- | :--- | :--- |
+| **O** | $\ge 30,000\text{ K}$ | Blue-violet (`#9bb0ff`) | Massive ZAMS / Blue Supergiant |
+| **B** | $10,000 - 30,000\text{ K}$ | Blue-white (`#aabfff`) | Intermediate-massive MS |
+| **A** | $7,500 - 10,000\text{ K}$ | White (`#cad7ff`) | Vega / Sirius A analogue |
+| **F** | $6,000 - 7,500\text{ K}$ | Yellow-white (`#f8f9ff`) | Procyon analogue |
+| **G** | $5,200 - 6,000\text{ K}$ | Solar Yellow (`#fff4e8`) | Sun ($5778\text{ K}$, G2 V) |
+| **K** | $3,700 - 5,200\text{ K}$ | Orange (`#ffd2a1`) | Arcturus / Aldebaran analogue |
+| **M** | $2,400 - 3,700\text{ K}$ | Deep Red (`#ffcc6f` / `#ff9e54`) | Betelgeuse / Proxima Centauri |
+| **D** | Any (Remnant) | Icy Blue-White (`#e0ecff`) | Degenerate White Dwarf |
+| **NS / BH** | Non-thermal / Horizon | Violet / Black Void | Compact relativistic remnants |
+
+**Luminosity Classes:**
+- `I`: Supergiant (Massive evolved stars)
+- `II`: Bright Giant
+- `III`: Red Giant Branch / Horizontal Branch / AGB
+- `IV`: Subgiant (Shell H-burning)
+- `V`: Main Sequence (Dwarf)
+- `VII`: Degenerate White Dwarf
 
 ---
 

@@ -1164,15 +1164,87 @@ function GalaxyStarInfo({ star, onEnterSystem }: GalaxyStarInfoProps) {
   );
 }
 
-function SystemStarInfo({ body }: { body: CelestialBody }) {
+function formatStellarAge(years: number): string {
+  if (years >= 1e9) return `${(years / 1e9).toFixed(2)} Gyr`;
+  if (years >= 1e6) return `${(years / 1e6).toFixed(1)} Myr`;
+  if (years >= 1e3) return `${(years / 1e3).toFixed(0)} Kyr`;
+  return `${years.toFixed(0)} yr`;
+}
+
+function SystemStarInfo({
+  body,
+  onAdvanceAge,
+  onResetZAMS,
+}: {
+  body: CelestialBody;
+  onAdvanceAge?: (years: number) => void;
+  onResetZAMS?: () => void;
+}) {
   const sp = body.starProperties;
+  const evo = sp?.evolution;
+
   return (
     <>
-      <InfoRow label="TYPE" value={`${sp?.spectralClass ?? '?'}-type Star`} />
+      {evo ? (
+        <>
+          <InfoRow label="EVOLUTIONARY PHASE" value={evo.phaseLabel} />
+          <InfoRow label="CLASSIFICATION" value={`${evo.spectralClass} ${evo.luminosityClass}`} />
+          <InfoRow label="STELLAR AGE" value={formatStellarAge(evo.ageYears)} />
+          <InfoRow label="MS LIFETIME" value={formatStellarAge(evo.mainSequenceLifetimeYears)} />
+          <InfoRow label="PHASE PROGRESS" value={`${(evo.phaseProgress * 100).toFixed(1)}%`} />
+        </>
+      ) : (
+        <InfoRow label="TYPE" value={`${sp?.spectralClass ?? '?'}-type Star`} />
+      )}
       <InfoRow label="MASS" value={`${(body.mass / SOLAR_MASS).toFixed(3)} M☉`} />
       <InfoRow label="RADIUS" value={`${(body.radius / SOLAR_RADIUS).toFixed(3)} R☉`} />
       <InfoRow label="TEMPERATURE" value={`${formatNumber(sp?.temperature ?? 0, 0)} K`} />
       <InfoRow label="LUMINOSITY" value={`${formatNumber((sp?.luminosity ?? 0) / 3.828e26)} L☉`} />
+
+      {evo && onAdvanceAge && (
+        <>
+          <Divider />
+          <div style={styles.sectionHeader}>STELLAR EVOLUTION TIMELINE</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 8 }}>
+            <button
+              style={styles.timeStepButton}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAdvanceAge(5.0e8); // +500 Myr
+              }}
+            >
+              +500 MYR
+            </button>
+            <button
+              style={styles.timeStepButton}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAdvanceAge(1.0e9); // +1.0 Gyr
+              }}
+            >
+              +1.0 GYR
+            </button>
+            <button
+              style={styles.timeStepButton}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAdvanceAge(2.5e9); // +2.5 Gyr
+              }}
+            >
+              +2.5 GYR
+            </button>
+            <button
+              style={{ ...styles.timeStepButton, color: '#f59e0b', borderColor: 'rgba(245, 158, 11, 0.4)' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onResetZAMS?.();
+              }}
+            >
+              ↺ RESET ZAMS
+            </button>
+          </div>
+        </>
+      )}
     </>
   );
 }
@@ -1346,6 +1418,8 @@ export interface UnifiedInfoPanelProps {
   currentPhysicalDiameterLy?: number;
   activeRenderedStars?: number;
   isRegenerating?: boolean;
+  onAdvanceStellarAge?: (years: number) => void;
+  onResetStellarAge?: () => void;
 }
 
 export function UnifiedInfoPanel({
@@ -1371,11 +1445,13 @@ export function UnifiedInfoPanel({
   currentPhysicalDiameterLy,
   activeRenderedStars,
   isRegenerating,
+  onAdvanceStellarAge,
+  onResetStellarAge,
 }: UnifiedInfoPanelProps) {
   // System view: show celestial body info
   if (inSystemView && selectedBody) {
     return (
-      <div style={styles.container}>
+      <div style={styles.container} onClick={(e) => e.stopPropagation()}>
         <button style={styles.backButton} onClick={onExitSystem}>
           ← BACK TO GALAXY
         </button>
@@ -1384,7 +1460,13 @@ export function UnifiedInfoPanel({
           <span style={styles.name}>{selectedBody.name}</span>
         </div>
         <Divider />
-        {selectedBody.type === CelestialBodyType.STAR && <SystemStarInfo body={selectedBody} />}
+        {selectedBody.type === CelestialBodyType.STAR && (
+          <SystemStarInfo
+            body={selectedBody}
+            onAdvanceAge={onAdvanceStellarAge}
+            onResetZAMS={onResetStellarAge}
+          />
+        )}
         {selectedBody.type === CelestialBodyType.PLANET && <SystemPlanetInfo body={selectedBody} />}
         <Divider />
         <InfoRow label="SEED" value={selectedBody.seed.toString()} />
@@ -1395,7 +1477,7 @@ export function UnifiedInfoPanel({
   // System view: no body selected, show back button
   if (inSystemView) {
     return (
-      <div style={styles.container}>
+      <div style={styles.container} onClick={(e) => e.stopPropagation()}>
         <button style={styles.backButton} onClick={onExitSystem}>
           ← BACK TO GALAXY
         </button>
@@ -2026,5 +2108,18 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#64748b',
     textAlign: 'center',
     padding: '20px 0',
+  },
+  timeStepButton: {
+    padding: '6px 8px',
+    background: 'rgba(15, 23, 42, 0.75)',
+    border: '1px solid rgba(56, 189, 248, 0.3)',
+    borderRadius: 6,
+    color: '#38bdf8',
+    fontSize: 9,
+    fontWeight: 600,
+    letterSpacing: 0.8,
+    cursor: 'pointer',
+    fontFamily: "'JetBrains Mono', monospace",
+    transition: 'all 0.15s ease',
   },
 };

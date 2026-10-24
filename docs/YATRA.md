@@ -77,40 +77,45 @@ ASTRAVERSA Ω is developed through a series of **Missions** — focused mileston
 
 ---
 
-## 🔮 Mission 003 — CELESTIAL MECHANICS
-### "Orbits Refined"
+## ✅ Mission 003 — GATI (गति): CELESTIAL MECHANICS & OBSERVATORY
+### "Orbits Refined & Cinematic Observatory"
 
-**Status:** Planned
+**Status:** ✅ Complete
 
-**Objective:** Enhanced orbital mechanics and N-body simulation.
+**Objective:** Advanced Keplerian orbital mechanics, numerical stability, collision detection, and cinematic galaxy observatory.
 
-**Key Features:**
-- Elliptical orbits (Keplerian elements)
-- Moon generation and orbits
-- Improved numerical integration (adaptive timestep)
-- Orbital resonances
-- Basic collision detection
-- Trail visualization
-
-**Dependencies:** Mission 002 complete
+**Deliverables:**
+- [x] Keplerian orbital elements conversion (`orbitalElements.ts`)
+- [x] Universal Kepler solver and state vector propagation
+- [x] Polar, retrograde, and high-eccentricity orbit dynamics
+- [x] Orbital resonance identification and period ratio analysis (`orbitalResonance.ts`)
+- [x] Collision detection and elastic/inelastic impulse kinematics (`collisionDetection.ts`)
+- [x] Conservation diagnostics (energy, linear momentum, angular momentum)
+- [x] Mission 003A: Galaxy Observatory control audit (star counts, cloud densities, spiral morphology, rigid rotation separation)
+- [x] Test suite expanded (+28 orbital tests, +14 resonance tests, +15 collision tests, +13 conservation tests, +17 observatory tests, +8 parameter audit tests)
 
 ---
 
-## 🔮 Mission 004 — STELLAR EVOLUTION
+## ✅ Mission 004 — STELLAR EVOLUTION (Vertical Slice)
 ### "Life and Death of Stars"
 
-**Status:** Planned
+**Status:** ✅ Complete (Vertical Slice)
 
-**Objective:** Stars that age, evolve, and die.
+**Objective:** Scientifically grounded, deterministic stellar lifecycle evolution driven by simulation time and physical parameters.
 
-**Key Features:**
-- Hertzsprung-Russell diagram tracking
-- Main sequence → red giant → white dwarf / supernova
-- Stellar lifetime based on mass
-- Visual evolution (color, size changes)
-- Nebula remnants
-
-**Dependencies:** Mission 003 complete
+**Deliverables:**
+- [x] Analytic piecewise stellar evolution model (`src/astronomy/stellarEvolution.ts`)
+- [x] Zero-Age Main Sequence (ZAMS) mass-luminosity and mass-radius scaling
+- [x] Stefan-Boltzmann thermodynamic consistency ($L = 4\pi R^2 \sigma T_{\text{eff}}^4$ in SI units)
+- [x] Main-sequence lifetime calculation ($\tau_{\text{MS}} \approx 10^{10} (M/M_\odot)^{-2.5}\text{ yr}$) with convective and radiative asymptotic limits
+- [x] Evolutionary phases: Main Sequence (V), Subgiant (IV), Red Giant Branch (III), Core Helium Burning / Horizontal Branch, Asymptotic Giant Branch, and White Dwarf cooling (VII)
+- [x] Hayashi convective boundary limit for realistic red giant expansion ($R \sim 50 - 150 R_\odot$)
+- [x] Degenerate White Dwarf cooling track (Mestel's cooling law) and core-collapse endpoints
+- [x] Deterministic PRNG isolation (`rng.deriveSeed(888)`) in solar system generation preserving 100% byte-for-byte planetary invariance
+- [x] Simulation engine integration (`advanceStellarAge` and `setStarAge`) linking physical updates to clock progression
+- [x] Interactive UI timeline controls (`+500 MYR`, `+1.0 GYR`, `+2.5 GYR`, `↺ RESET ZAMS`)
+- [x] Deterministic test suite (23 tests in `tests/stellarEvolution.test.ts`, 214 total test suite passing)
+- [x] Clean typecheck (`tsc -b`) and production build
 
 ---
 

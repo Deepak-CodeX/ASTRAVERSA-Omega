@@ -84,8 +84,9 @@ Galaxy (ANANTARA α — 500k ly main stellar-body disk, 750k ly halo)
 
 | Component | Responsibility |
 |-----------|---------------|
-| `constants` | Physical constants (G, AU, kpc, solar mass, etc.) and unit conversions |
+| `constants` | Physical constants (G, AU, kpc, solar mass, Stefan-Boltzmann $\sigma$, etc.) and unit conversions |
 | `stellar` | Main-sequence stellar classification and property derivation |
+| `stellarEvolution` | Piecewise stellar lifecycles, $\tau_{\text{MS}}$ scaling, Hayashi convective limit, Mestel cooling, and compact remnant endpoints |
 | `planetary` | Planetary type classification and orbital mechanics |
 
 **Dependencies:** None (pure data and functions)
@@ -98,19 +99,20 @@ Galaxy (ANANTARA α — 500k ly main stellar-body disk, 750k ly halo)
 
 | Component | Responsibility |
 |-----------|---------------|
-| `SeededRandom` | Deterministic PRNG with hierarchical seed derivation |
-| `CelestialBody` | Core data structure for all celestial objects (with physics state) |
-| `SolarSystemGenerator` | Procedural star + planet generation from seed |
+| `SeededRandom` | Deterministic PRNG with hierarchical seed derivation (`deriveSeed`, `fork`) |
+| `CelestialBody` | Core data structure for all celestial objects (with physics state and `StellarEvolutionState`) |
+| `SolarSystemGenerator` | Procedural star + planet generation from seed (with isolated sub-PRNG stream for stellar evolution) |
 | `Galaxy` | Domain model for galaxies, clusters, lightweight stars, and SMBH with radio jets |
 | `GalaxyGenerator` | Procedural SBbc barred spiral galaxy generation from seed (500k ly disk, 750k ly halo, triaxial bar, 4 continuous arms, dual disks, ANANTARA A* SMBH with `recalculateSupermassiveBlackHole`) |
 | `Universe` | Top-level container, navigation, view level management, generation entry point, and `setNucleusMass` runtime mass reconfiguration |
 
-**Dependencies:** Physics (Vector3), Astronomy (constants, stellar, planetary)
+**Dependencies:** Physics (Vector3), Astronomy (constants, stellar, stellarEvolution, planetary)
 
 **Key Design:**
 - `GalaxyStar` is lightweight (position, color, seed) for rendering thousands
-- `CelestialBody` is heavyweight (velocity, acceleration, physics state) for simulation
+- `CelestialBody` is heavyweight (velocity, acceleration, physics state, stellar evolution) for simulation
 - Full `CelestialBody` objects are only created when entering a star system
+- Stellar evolution initialization derives from an isolated sub-stream (`rng.deriveSeed(888)`) to maintain 100% byte-for-byte invariance in planetary generation
 
 ---
 
@@ -121,11 +123,11 @@ Galaxy (ANANTARA α — 500k ly main stellar-body disk, 750k ly halo)
 | Component | Responsibility |
 |-----------|---------------|
 | `SimulationClock` | Frame-rate-independent time with multipliers and substeps |
-| `SimulationEngine` | Physics integration loop, state orchestration |
+| `SimulationEngine` | Physics integration loop, state orchestration, `advanceStellarAge(deltaYears)`, and `setStarAge(star, ageYears)` |
 
-**Dependencies:** Physics (Vector3, gravity, integrator), Astronomy (constants), Universe (CelestialBody)
+**Dependencies:** Physics (Vector3, gravity, integrator), Astronomy (constants, stellarEvolution), Universe (CelestialBody)
 
-**Note:** The engine is only active when viewing a planetary system. Galaxy-scale physics are not simulated.
+**Note:** The engine is active when viewing a planetary system. Gravity integrates orbital mechanics while simulation time advances stellar evolution lifecycles.
 
 ---
 
@@ -166,11 +168,9 @@ Galaxy (ANANTARA α — 500k ly main stellar-body disk, 750k ly halo)
 
 | Component | Responsibility |
 |-----------|---------------|
-| `App` | Application shell, navigation state, view routing, nucleus mass reconfiguration handler |
+| `App` | Application shell, navigation state, view routing, nucleus mass reconfiguration handler, and stellar evolution timeline orchestration |
 | `TimeControls` | Speed/pause controls, time display (system view only) |
-| `GalaxyInfoPanel` | Unified info panel with 9 waypoint jumps (including RADIO JETS), 7 layer toggles, SMBH mass presets (4.15M, 50M, 1.0B, 40B), full physical metadata readouts ($r_s$, $r_{\text{ph}}$, $L_{\text{Edd}}$, $\sigma$, $r_{\text{infl}}$, radio jet span), and scale separation callout notices |
-
-**Dependencies:** Engine, Universe, Rendering
+| `GalaxyInfoPanel` / `UnifiedInfoPanel` | Unified info panel with 9 waypoint jumps, 7 layer toggles, SMBH mass presets, full physical metadata readouts, and interactive Stellar Evolution Timeline controls (`+500 MYR`, `+1.0 GYR`, `+2.5 GYR`, `↺ RESET ZAMS`) |
 
 **Dependencies:** Engine, Universe, Rendering
 

@@ -269,6 +269,64 @@ describe('Cartesian ↔ Orbital Elements Conversion', () => {
     const result = cartesianToOrbital(new Vector3(AU, 0, 0), new Vector3(0, 0, 30000), 0);
     expect(result).toBeNull();
   });
+
+  it('converts polar orbit (i = π/2)', () => {
+    // Polar orbit in standard frame: inclination 90°
+    const r = new Vector3(AU, 0, 0);
+    const v_circ = Math.sqrt(MU_SUN / AU);
+    // Velocity pointing along Y (perpendicular to X in simulation Y-up, purely vertical orbit)
+    const v = new Vector3(0, v_circ, 0);
+
+    const elements = cartesianToOrbital(r, v, MU_SUN);
+    expect(elements).not.toBeNull();
+    if (!elements) return;
+
+    expect(elements.inclination).toBeCloseTo(Math.PI / 2, 4);
+    expect(elements.eccentricity).toBeCloseTo(0, 4);
+    expect(elements.semiMajorAxis).toBeCloseTo(AU, -5);
+  });
+
+  it('converts retrograde equatorial orbit (i = π)', () => {
+    // Retrograde orbit in XZ plane: velocity is opposite to prograde
+    const r = new Vector3(AU, 0, 0);
+    const v_circ = Math.sqrt(MU_SUN / AU);
+    const v = new Vector3(0, 0, -v_circ); // opposite direction to standard prograde
+
+    const elements = cartesianToOrbital(r, v, MU_SUN);
+    expect(elements).not.toBeNull();
+    if (!elements) return;
+
+    expect(elements.inclination).toBeCloseTo(Math.PI, 4);
+    expect(elements.eccentricity).toBeCloseTo(0, 4);
+    expect(elements.semiMajorAxis).toBeCloseTo(AU, -5);
+  });
+
+  it('round-trip: high eccentricity orbit (e = 0.85)', () => {
+    const original: OrbitalElements = {
+      semiMajorAxis: 3 * AU,
+      eccentricity: 0.85,
+      inclination: Math.PI / 3,
+      longitudeOfAscendingNode: 1.2,
+      argumentOfPeriapsis: 2.1,
+      trueAnomaly: 0.8,
+    };
+
+    const { position, velocity } = orbitalToCartesian(original, MU_SUN);
+    const recovered = cartesianToOrbital(position, velocity, MU_SUN);
+
+    expect(recovered).not.toBeNull();
+    if (!recovered) return;
+
+    expect(recovered.semiMajorAxis).toBeCloseTo(original.semiMajorAxis, -3);
+    expect(recovered.eccentricity).toBeCloseTo(original.eccentricity, 6);
+    expect(recovered.inclination).toBeCloseTo(original.inclination, 6);
+    expect(normalizeAngle(recovered.longitudeOfAscendingNode))
+      .toBeCloseTo(normalizeAngle(original.longitudeOfAscendingNode), 6);
+    expect(normalizeAngle(recovered.argumentOfPeriapsis))
+      .toBeCloseTo(normalizeAngle(original.argumentOfPeriapsis), 6);
+    expect(normalizeAngle(recovered.trueAnomaly))
+      .toBeCloseTo(normalizeAngle(original.trueAnomaly), 6);
+  });
 });
 
 describe('Orbital Radius', () => {

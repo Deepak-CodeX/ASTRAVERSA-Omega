@@ -31,7 +31,7 @@ import { SimulationEngine } from '../engine/SimulationEngine';
 import { Universe } from '../universe/Universe';
 import { ViewLevel } from '../universe/Galaxy';
 import type { GalaxyStar, StarCluster } from '../universe/Galaxy';
-import type { CelestialBody } from '../universe/CelestialBody';
+import { type CelestialBody, CelestialBodyType } from '../universe/CelestialBody';
 import type { TimeMultiplier } from '../engine/SimulationClock';
 
 /** Default universe seed for deterministic initial experience */
@@ -305,7 +305,7 @@ export function App() {
       engine.initialize(system.bodies);
       engine.start(1);
       setViewLevel(ViewLevel.SYSTEM);
-      setSelectedBodyId(null);
+      setSelectedBodyId(system.bodies[0]?.id ?? null);
       setTick(t => t + 1);
     }
   }, [selectedStarIndex, universe, engine]);
@@ -326,6 +326,19 @@ export function App() {
     engine.setTimeMultiplier(multiplier);
     setTick(t => t + 1);
   }, [engine]);
+
+  const handleAdvanceStellarAge = useCallback((years: number) => {
+    engine.advanceStellarAge(years);
+    setTick(t => t + 1);
+  }, [engine]);
+
+  const handleResetStellarAge = useCallback(() => {
+    const star = universe.bodies.find(b => b.type === CelestialBodyType.STAR);
+    if (star) {
+      engine.setStarAge(star, 0);
+      setTick(t => t + 1);
+    }
+  }, [universe, engine]);
 
   // Periodically update time display
   useEffect(() => {
@@ -438,6 +451,8 @@ export function App() {
         currentPhysicalDiameterLy={currentPhysicalDiameterLy}
         activeRenderedStars={activeRenderedStars}
         isRegenerating={isRegenerating}
+        onAdvanceStellarAge={handleAdvanceStellarAge}
+        onResetStellarAge={handleResetStellarAge}
       />
     </div>
   );

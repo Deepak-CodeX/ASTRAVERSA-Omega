@@ -13,6 +13,7 @@
 import { Vector3 } from '../physics/Vector3';
 import type { PlanetType } from '../astronomy/planetary';
 import type { SpectralClass } from '../astronomy/stellar';
+import type { StellarEvolutionState } from '../astronomy/stellarEvolution';
 
 /**
  * Types of celestial bodies.
@@ -32,6 +33,7 @@ export interface StarProperties {
   spectralClass: SpectralClass;
   luminosity: number;  // W
   temperature: number; // K
+  evolution?: StellarEvolutionState;
 }
 
 /**

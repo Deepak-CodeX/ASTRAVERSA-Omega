@@ -20,7 +20,11 @@
 import { SeededRandom } from './SeededRandom';
 import type { CelestialBody } from './CelestialBody';
 import { CelestialBodyType, createCelestialBody } from './CelestialBody';
-import { computeStellarProperties } from '../astronomy/stellar';
+import type { SpectralClass } from '../astronomy/stellar';
+import {
+  computeStellarEvolution,
+  computeMainSequenceLifetime,
+} from '../astronomy/stellarEvolution';
 import {
   getPlanetType,
   getPlanetTypeData,
@@ -131,22 +135,34 @@ export function generateSolarSystem(seed: number): SolarSystem {
   // ── Generate Star ──────────────────────────────────
   const starName = generateStarName(rng);
   const stellarMass = sampleStellarMass(rng);
-  const stellar = computeStellarProperties(stellarMass);
+
+  // Derive initial stellar age deterministically using an isolated child PRNG stream
+  const starEvolutionRng = new SeededRandom(rng.deriveSeed(888));
+  const tMS = computeMainSequenceLifetime(stellarMass);
+  // Default to mature main sequence star (15% to 65% through MS lifetime)
+  const ageFraction = starEvolutionRng.range(0.15, 0.65);
+  const initialAgeYears = ageFraction * tMS;
+
+  const evolution = computeStellarEvolution({
+    initialMassSolar: stellarMass,
+    ageYears: initialAgeYears,
+  });
 
   const star = createCelestialBody({
     id: `star-${seed}`,
     name: starName,
     type: CelestialBodyType.STAR,
-    mass: stellar.mass,
-    radius: stellar.radius,
+    mass: evolution.currentMassKg,
+    radius: evolution.radiusMeters,
     position: Vector3.zero(),
     velocity: Vector3.zero(),
-    color: stellar.color,
+    color: evolution.color,
     seed,
     starProperties: {
-      spectralClass: stellar.spectralClass,
-      luminosity: stellar.luminosity,
-      temperature: stellar.temperature,
+      spectralClass: evolution.spectralClass as SpectralClass,
+      luminosity: evolution.luminosityWatts,
+      temperature: evolution.effectiveTemperature,
+      evolution,
     },
   });
 
@@ -190,8 +206,8 @@ export function generateSolarSystem(seed: number): SolarSystem {
     }
 
     // Compute circular orbital velocity
-    const velocity = circularOrbitalVelocity(stellar.mass, orbitalDistanceM);
-    const period = orbitalPeriod(stellar.mass, orbitalDistanceM);
+    const velocity = circularOrbitalVelocity(star.mass, orbitalDistanceM);
+    const period = orbitalPeriod(star.mass, orbitalDistanceM);
 
     // Initial position: distribute planets at random orbital angles
     const angle = planetRng.range(0, 2 * Math.PI);
