@@ -1355,14 +1355,6 @@ interface RelativisticJetsProps {
 }
 
 function RelativisticJetsRenderer({ galaxy, time = 0 }: RelativisticJetsProps) {
-  const nucleus = galaxy.nucleus;
-  if (!nucleus) return null;
-
-  const jetLengthKpc = nucleus.jetLengthKpc ?? 52.0;
-
-  // Scene scaling for collimated radio jets: length ~540 scene units
-  const jetLengthScene = Math.min(750, Math.max(300, jetLengthKpc * RENDER_SCALE_KPC * 0.35));
-
   const northMatRef = useRef<THREE.ShaderMaterial>(null);
   const southMatRef = useRef<THREE.ShaderMaterial>(null);
 
@@ -1385,6 +1377,14 @@ function RelativisticJetsRenderer({ galaxy, time = 0 }: RelativisticJetsProps) {
       uOpacity: { value: 0.12 },
     },
   }), []);
+
+  const nucleus = galaxy.nucleus;
+  if (!nucleus) return null;
+
+  const jetLengthKpc = nucleus.jetLengthKpc ?? 52.0;
+
+  // Scene scaling for collimated radio jets: length ~540 scene units
+  const jetLengthScene = Math.min(750, Math.max(300, jetLengthKpc * RENDER_SCALE_KPC * 0.35));
 
   return (
     <group position={[0, 0, 0]}>
