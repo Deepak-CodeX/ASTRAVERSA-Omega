@@ -48,6 +48,16 @@ import {
 import { AU } from '../astronomy/constants';
 import { Vector3 } from '../physics/Vector3';
 
+import { G } from '../astronomy/constants';
+
+/**
+ * Options for solar system generation.
+ */
+export interface SolarSystemGenerationOptions {
+  /** If true, deterministically generates secondary natural satellites (moons) within Hill spheres */
+  includeMoons?: boolean;
+}
+
 /**
  * Result of solar system generation.
  */
@@ -61,7 +71,10 @@ export interface SolarSystem {
   /** The planets orbiting the star */
   planets: CelestialBody[];
 
-  /** All bodies in the system (star + planets) */
+  /** The moons orbiting planets (Mission P1-A) */
+  moons?: CelestialBody[];
+
+  /** All bodies in the system (star + planets + optional moons) */
   bodies: CelestialBody[];
 }
 
@@ -138,7 +151,10 @@ function sampleStellarMass(rng: SeededRandom): number {
  * @param seed - Integer seed for deterministic generation
  * @returns A SolarSystem containing a star and planets
  */
-export function generateSolarSystem(seed: number): SolarSystem {
+export function generateSolarSystem(
+  seed: number,
+  options?: SolarSystemGenerationOptions
+): SolarSystem {
   const rng = new SeededRandom(seed);
 
   // ── Generate Star ──────────────────────────────────
@@ -283,11 +299,20 @@ export function generateSolarSystem(seed: number): SolarSystem {
       velocity: velocityVec,
       color,
       seed: planetRng.deriveSeed(0),
+      parentId: star.id,
       planetProperties: {
         planetType,
         orbitalRadius: orbitalDistanceM,
         orbitalPeriod: period,
         parentId: star.id,
+        orbitalElements: {
+          semiMajorAxis: orbitalDistanceM,
+          eccentricity: 0.0,
+          inclination: 0.0,
+          longitudeOfAscendingNode: 0.0,
+          argumentOfPeriapsis: 0.0,
+          trueAnomaly: angle,
+        },
         albedo,
         equilibriumTemperature,
         insolationFlux,
@@ -298,10 +323,146 @@ export function generateSolarSystem(seed: number): SolarSystem {
     }));
   }
 
+  const allMoons: CelestialBody[] = [];
+  if (options?.includeMoons) {
+    for (let i = 0; i < planets.length; i++) {
+      const planetMoons = generateMoonsForPlanet(planets[i], star.mass, i, seed);
+      allMoons.push(...planetMoons);
+    }
+  }
+
   return {
     seed,
     star,
     planets,
-    bodies: [star, ...planets],
+    moons: allMoons,
+    bodies: options?.includeMoons ? [star, ...planets, ...allMoons] : [star, ...planets],
   };
+}
+
+/**
+ * Compute the Hill sphere radius for a secondary body orbiting a primary star.
+ *
+ * r_H = a * (M_p / (3 * M_*))^(1/3)
+ *
+ * @param semiMajorAxisMeters - Planetary semi-major axis in meters
+ * @param planetMassKg - Planetary mass in kg
+ * @param starMassKg - Central star mass in kg
+ */
+export function computeHillRadius(
+  semiMajorAxisMeters: number,
+  planetMassKg: number,
+  starMassKg: number
+): number {
+  if (starMassKg <= 0 || planetMassKg <= 0 || semiMajorAxisMeters <= 0) return 0;
+  return semiMajorAxisMeters * Math.cbrt(planetMassKg / (3 * starMassKg));
+}
+
+/**
+ * Deterministically generate natural satellites (moons) for a planet within its dynamically stable Hill sphere.
+ *
+ * Grounded in dynamical stability:
+ * - Domingos, Winter & Yokoyama (2006): Stable prograde satellite orbits require r <= 0.49 * r_H.
+ *   We enforce r_moon in [max(3*R_p, 50,000 km), 0.35 * r_H] for guaranteed long-term N-body stability.
+ * - Gas / ice giants have high capture cross-sections (1 to 3 moons).
+ * - Massive terrestrial worlds (M > 0.5 M_earth) can host 0 to 1 moon.
+ */
+export function generateMoonsForPlanet(
+  planet: CelestialBody,
+  starMassKg: number,
+  planetIndex: number,
+  parentSeed: number
+): CelestialBody[] {
+  const pp = planet.planetProperties;
+  if (!pp) return [];
+
+  const rH = computeHillRadius(pp.orbitalRadius, planet.mass, starMassKg);
+  const rMin = Math.max(3 * planet.radius, 50_000_000);
+  const rMax = 0.35 * rH;
+
+  if (rMin >= rMax || rH <= 0) {
+    return [];
+  }
+
+  const moonRng = new SeededRandom(parentSeed + planetIndex * 1337 + 777);
+
+  let moonCount = 0;
+  if (planet.mass >= 50 * 5.972e24) {
+    moonCount = moonRng.rangeInt(1, 3);
+  } else if (planet.mass >= 10 * 5.972e24) {
+    moonCount = moonRng.rangeInt(1, 2);
+  } else if (planet.mass >= 0.5 * 5.972e24) {
+    moonCount = moonRng.next() < 0.6 ? 1 : 0;
+  } else {
+    moonCount = 0;
+  }
+
+  const moons: CelestialBody[] = [];
+  const moonLetters = ['a', 'b', 'c', 'd', 'e'];
+
+  for (let m = 0; m < moonCount; m++) {
+    const frac = (m + 0.5) / moonCount;
+    const distanceM = rMin + frac * (rMax - rMin) * moonRng.range(0.9, 1.1);
+    const safeDistanceM = Math.min(distanceM, rMax * 0.95);
+
+    const moonMass = planet.mass * moonRng.range(1.5e-5, 1.2e-4);
+    const density = moonRng.range(2200, 3400);
+    const moonVolume = moonMass / density;
+    const moonRadius = Math.cbrt((3 * moonVolume) / (4 * Math.PI));
+
+    const period = 2 * Math.PI * Math.sqrt(Math.pow(safeDistanceM, 3) / (G * (planet.mass + moonMass)));
+    const vCircular = Math.sqrt((G * planet.mass) / safeDistanceM);
+
+    const angle = moonRng.range(0, 2 * Math.PI);
+    const relPos = new Vector3(
+      safeDistanceM * Math.cos(angle),
+      0,
+      safeDistanceM * Math.sin(angle)
+    );
+    const relVel = new Vector3(
+      -vCircular * Math.sin(angle),
+      0,
+      vCircular * Math.cos(angle)
+    );
+
+    const moonColor = moonRng.pick(['#cbd5e1', '#94a3b8', '#a1a1aa', '#cbd5e1', '#e2e8f0', '#d4d4d8']);
+    const moonId = `moon-${planet.id}-${m}`;
+    const moonName = `${planet.name} ${moonLetters[m] ?? (m + 1).toString()}`;
+
+    moons.push(createCelestialBody({
+      id: moonId,
+      name: moonName,
+      type: CelestialBodyType.MOON,
+      mass: moonMass,
+      radius: moonRadius,
+      position: new Vector3(
+        planet.position.x + relPos.x,
+        planet.position.y + relPos.y,
+        planet.position.z + relPos.z
+      ),
+      velocity: new Vector3(
+        planet.velocity.x + relVel.x,
+        planet.velocity.y + relVel.y,
+        planet.velocity.z + relVel.z
+      ),
+      color: moonColor,
+      seed: moonRng.deriveSeed(m),
+      parentId: planet.id,
+      moonProperties: {
+        orbitalRadius: safeDistanceM,
+        orbitalPeriod: period,
+        parentId: planet.id,
+        orbitalElements: {
+          semiMajorAxis: safeDistanceM,
+          eccentricity: 0.0,
+          inclination: 0.0,
+          longitudeOfAscendingNode: 0.0,
+          argumentOfPeriapsis: 0.0,
+          trueAnomaly: angle,
+        },
+      },
+    }));
+  }
+
+  return moons;
 }

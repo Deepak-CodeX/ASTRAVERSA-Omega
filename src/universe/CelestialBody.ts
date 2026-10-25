@@ -11,6 +11,7 @@
  */
 
 import { Vector3 } from '../physics/Vector3';
+import type { OrbitalElements } from '../physics/orbitalElements';
 import type { PlanetType } from '../astronomy/planetary';
 import type { SpectralClass } from '../astronomy/stellar';
 import type { StellarEvolutionState } from '../astronomy/stellarEvolution';
@@ -52,6 +53,9 @@ export interface PlanetProperties {
   orbitalPeriod: number;  // seconds
   parentId: string;       // ID of the parent star
 
+  /** Classical Keplerian orbital elements (Mission P1-A) */
+  orbitalElements?: OrbitalElements;
+
   // Stellar–Planetary Coupling (Mission 004B)
   /** Planetary Bond albedo (dimensionless fraction in [0, 1)) */
   albedo: number;
@@ -76,6 +80,9 @@ export interface MoonProperties {
   orbitalRadius: number;  // m (semi-major axis around parent planet)
   orbitalPeriod: number;  // seconds
   parentId: string;       // ID of the parent planet
+
+  /** Classical Keplerian orbital elements relative to parent planet (Mission P1-A) */
+  orbitalElements?: OrbitalElements;
 }
 
 /**

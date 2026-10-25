@@ -27,12 +27,14 @@ import {
 } from '../rendering';
 import { TimeControls } from './TimeControls';
 import { UnifiedInfoPanel } from './GalaxyInfoPanel';
+import { SystemEditor } from './SystemEditor';
 import { SimulationEngine } from '../engine/SimulationEngine';
 import { Universe } from '../universe/Universe';
 import { ViewLevel } from '../universe/Galaxy';
 import type { GalaxyStar, StarCluster } from '../universe/Galaxy';
 import { type CelestialBody, CelestialBodyType } from '../universe/CelestialBody';
 import type { TimeMultiplier } from '../engine/SimulationClock';
+import type { OrbitalElements } from '../physics/orbitalElements';
 
 /** Default universe seed for deterministic initial experience */
 const DEFAULT_SEED = 42;
@@ -59,6 +61,7 @@ export function App() {
   const [selectedStarIndex, setSelectedStarIndex] = useState<number | null>(null);
   const [selectedNucleus, setSelectedNucleus] = useState<boolean>(false);
   const [selectedBodyId, setSelectedBodyId] = useState<string | null>(null);
+  const [isEditorOpen, setIsEditorOpen] = useState<boolean>(false);
   const [tick, setTick] = useState(0);
 
   // ── Observatory State ───────────────────────────
@@ -318,6 +321,7 @@ export function App() {
     engine.pause();
     setViewLevel(ViewLevel.GALAXY);
     setSelectedBodyId(null);
+    setIsEditorOpen(false);
     setTick(t => t + 1);
   }, [universe, engine]);
 
@@ -341,6 +345,46 @@ export function App() {
       engine.setStarAge(star, 0);
       setTick(t => t + 1);
     }
+  }, [universe, engine]);
+
+  const handleApplyBodyEdits = useCallback((
+    bodyId: string,
+    physicalUpdates: { name: string; mass: number; radius: number; color: string },
+    orbitalUpdates?: OrbitalElements
+  ) => {
+    engine.updateBodyProperties(bodyId, physicalUpdates);
+    if (orbitalUpdates) {
+      engine.updateBodyOrbit(bodyId, orbitalUpdates);
+    }
+    const b = universe.findBody(bodyId);
+    if (b) {
+      b.name = physicalUpdates.name;
+      b.mass = physicalUpdates.mass;
+      b.radius = physicalUpdates.radius;
+      b.color = physicalUpdates.color;
+      if (orbitalUpdates) {
+        if (b.planetProperties) {
+          b.planetProperties.orbitalElements = orbitalUpdates;
+        } else if (b.moonProperties) {
+          b.moonProperties.orbitalElements = orbitalUpdates;
+        }
+      }
+    }
+    setTick(t => t + 1);
+  }, [engine, universe]);
+
+  const handleAddPlanet = useCallback((newPlanet: CelestialBody) => {
+    universe.addBody(newPlanet);
+    engine.addBody(newPlanet);
+    setSelectedBodyId(newPlanet.id);
+    setTick(t => t + 1);
+  }, [universe, engine]);
+
+  const handleDeleteBody = useCallback((bodyId: string) => {
+    universe.removeBody(bodyId);
+    engine.removeBody(bodyId);
+    setSelectedBodyId(universe.bodies[0]?.id ?? null);
+    setTick(t => t + 1);
   }, [universe, engine]);
 
   // Expose test/debug handle on window
@@ -465,6 +509,8 @@ export function App() {
         inSystemView={inSystemView}
         onEnterSystem={handleEnterSystem}
         onExitSystem={handleExitSystem}
+        isEditorOpen={isEditorOpen}
+        onToggleEditor={() => setIsEditorOpen(prev => !prev)}
         activePreset={activePreset}
         onSelectPreset={handleSelectPreset}
         layers={layers}
@@ -480,6 +526,18 @@ export function App() {
         onAdvanceStellarAge={handleAdvanceStellarAge}
         onResetStellarAge={handleResetStellarAge}
       />
+
+      {/* Minimal System Editor (Mission P1-A) */}
+      {inSystemView && isEditorOpen && (
+        <SystemEditor
+          selectedBody={selectedBody}
+          allBodies={universe.bodies}
+          onApplyBodyEdits={handleApplyBodyEdits}
+          onAddPlanet={handleAddPlanet}
+          onDeleteBody={handleDeleteBody}
+          onClose={() => setIsEditorOpen(false)}
+        />
+      )}
     </div>
   );
 }

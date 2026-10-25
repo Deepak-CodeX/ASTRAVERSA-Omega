@@ -1313,6 +1313,12 @@ function SystemPlanetInfo({ body }: { body: CelestialBody }) {
         label="VELOCITY"
         value={`${formatNumber(Math.sqrt(body.velocity.x ** 2 + body.velocity.y ** 2 + body.velocity.z ** 2) / 1000)} km/s`}
       />
+      {pp?.orbitalElements && (
+        <>
+          <InfoRow label="ECCENTRICITY" value={pp.orbitalElements.eccentricity.toFixed(3)} />
+          <InfoRow label="INCLINATION" value={`${((pp.orbitalElements.inclination * 180) / Math.PI).toFixed(1)}°`} />
+        </>
+      )}
 
       {pp && pp.equilibriumTemperature !== undefined && (
         <>
@@ -1443,6 +1449,33 @@ function SystemPlanetInfo({ body }: { body: CelestialBody }) {
               • Thermal regimes and liquid water stability are approximate physical model states, NOT proof of habitability or life.
             </div>
           </div>
+        </>
+      )}
+    </>
+  );
+}
+
+function SystemMoonInfo({ body }: { body: CelestialBody }) {
+  const mp = body.moonProperties;
+  const orbitalKm = (mp?.orbitalRadius ?? 0) / 1000;
+  const periodDays = (mp?.orbitalPeriod ?? 0) / SECONDS_PER_DAY;
+  const elements = mp?.orbitalElements;
+
+  return (
+    <>
+      <InfoRow label="TYPE" value="Natural Satellite (Moon)" />
+      <InfoRow label="MASS" value={`${(body.mass / EARTH_MASS).toFixed(4)} M⊕`} />
+      <InfoRow label="RADIUS" value={`${(body.radius / 1000).toFixed(0)} km`} />
+      <InfoRow label="ORBIT RADIUS" value={`${formatNumber(orbitalKm, 0)} km`} />
+      <InfoRow label="PERIOD" value={`${periodDays.toFixed(2)} days`} />
+      <InfoRow
+        label="VELOCITY"
+        value={`${formatNumber(Math.sqrt(body.velocity.x ** 2 + body.velocity.y ** 2 + body.velocity.z ** 2) / 1000)} km/s`}
+      />
+      {elements && (
+        <>
+          <InfoRow label="ECCENTRICITY" value={elements.eccentricity.toFixed(3)} />
+          <InfoRow label="INCLINATION" value={`${((elements.inclination * 180) / Math.PI).toFixed(1)}°`} />
         </>
       )}
     </>
@@ -1582,6 +1615,8 @@ export interface UnifiedInfoPanelProps {
   inSystemView: boolean;
   onEnterSystem: () => void;
   onExitSystem: () => void;
+  isEditorOpen?: boolean;
+  onToggleEditor?: () => void;
   activePreset?: CameraPreset | null;
   onSelectPreset?: (preset: CameraPreset) => void;
   layers?: GalaxyLayerVisibility;
@@ -1609,6 +1644,8 @@ export function UnifiedInfoPanel({
   inSystemView,
   onEnterSystem,
   onExitSystem,
+  isEditorOpen,
+  onToggleEditor,
   activePreset,
   onSelectPreset,
   layers,
@@ -1631,6 +1668,17 @@ export function UnifiedInfoPanel({
         <button style={styles.backButton} onClick={onExitSystem}>
           ← BACK TO GALAXY
         </button>
+        {onToggleEditor && (
+          <button
+            style={{
+              ...styles.editorToggleButton,
+              ...(isEditorOpen ? styles.editorToggleButtonActive : {}),
+            }}
+            onClick={onToggleEditor}
+          >
+            {isEditorOpen ? '✕ CLOSE SYSTEM EDITOR' : '⚙️ OPEN SYSTEM EDITOR'}
+          </button>
+        )}
         <div style={styles.header}>
           <div style={{ ...styles.colorDot, backgroundColor: selectedBody.color }} />
           <span style={styles.name}>{selectedBody.name}</span>
@@ -1644,6 +1692,7 @@ export function UnifiedInfoPanel({
           />
         )}
         {selectedBody.type === CelestialBodyType.PLANET && <SystemPlanetInfo body={selectedBody} />}
+        {selectedBody.type === CelestialBodyType.MOON && <SystemMoonInfo body={selectedBody} />}
         <Divider />
         <InfoRow label="SEED" value={selectedBody.seed.toString()} />
       </div>
@@ -1657,6 +1706,17 @@ export function UnifiedInfoPanel({
         <button style={styles.backButton} onClick={onExitSystem}>
           ← BACK TO GALAXY
         </button>
+        {onToggleEditor && (
+          <button
+            style={{
+              ...styles.editorToggleButton,
+              ...(isEditorOpen ? styles.editorToggleButtonActive : {}),
+            }}
+            onClick={onToggleEditor}
+          >
+            {isEditorOpen ? '✕ CLOSE SYSTEM EDITOR' : '⚙️ OPEN SYSTEM EDITOR'}
+          </button>
+        )}
         <div style={styles.hint}>Click a star or planet to inspect</div>
       </div>
     );
@@ -2268,7 +2328,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   backButton: {
     width: '100%',
-    marginBottom: 10,
+    marginBottom: 8,
     padding: '6px 10px',
     background: 'rgba(30, 41, 59, 0.5)',
     border: '1px solid rgba(148, 163, 184, 0.2)',
@@ -2278,6 +2338,26 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: 1,
     cursor: 'pointer',
     fontFamily: "'JetBrains Mono', monospace",
+  },
+  editorToggleButton: {
+    width: '100%',
+    marginBottom: 10,
+    padding: '7px 10px',
+    background: 'rgba(56, 189, 248, 0.12)',
+    border: '1px solid rgba(56, 189, 248, 0.35)',
+    borderRadius: 6,
+    color: '#38bdf8',
+    fontSize: 9,
+    fontWeight: 600,
+    letterSpacing: 0.8,
+    cursor: 'pointer',
+    fontFamily: "'JetBrains Mono', monospace",
+    transition: 'all 0.15s ease',
+  },
+  editorToggleButtonActive: {
+    background: 'rgba(239, 68, 68, 0.15)',
+    border: '1px solid rgba(239, 68, 68, 0.45)',
+    color: '#f87171',
   },
   hint: {
     fontSize: 11,

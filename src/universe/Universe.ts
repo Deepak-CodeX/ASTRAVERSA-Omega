@@ -87,7 +87,7 @@ export class Universe {
     }
 
     const star = this._galaxy.stars[starIndex];
-    this._solarSystem = generateSolarSystem(star.seed);
+    this._solarSystem = generateSolarSystem(star.seed, { includeMoons: true });
     this._activeStarIndex = starIndex;
     this._navigation = {
       level: ViewLevel.SYSTEM,
@@ -173,6 +173,32 @@ export class Universe {
   /** Find a celestial body by ID. */
   findBody(id: string): CelestialBody | undefined {
     return this.bodies.find(body => body.id === id);
+  }
+
+  /**
+   * Add a body to the active solar system (Mission P1-A).
+   */
+  addBody(body: CelestialBody): void {
+    if (!this._solarSystem) return;
+    this._solarSystem.bodies.push(body);
+    if (body.type === 'PLANET') {
+      this._solarSystem.planets.push(body);
+    } else if (body.type === 'MOON') {
+      if (!this._solarSystem.moons) this._solarSystem.moons = [];
+      this._solarSystem.moons.push(body);
+    }
+  }
+
+  /**
+   * Remove a body from the active solar system, removing any orbiting moons as well (Mission P1-A).
+   */
+  removeBody(id: string): void {
+    if (!this._solarSystem) return;
+    this._solarSystem.bodies = this._solarSystem.bodies.filter(b => b.id !== id && b.parentId !== id);
+    this._solarSystem.planets = this._solarSystem.planets.filter(b => b.id !== id);
+    if (this._solarSystem.moons) {
+      this._solarSystem.moons = this._solarSystem.moons.filter(b => b.id !== id && b.parentId !== id);
+    }
   }
 
   // ── Navigation ──────────────────────────────

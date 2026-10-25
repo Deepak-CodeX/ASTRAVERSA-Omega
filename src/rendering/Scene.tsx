@@ -16,7 +16,8 @@ import { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Stars } from '@react-three/drei';
 import { CelestialBodyRenderer } from './CelestialBodyRenderer';
-import type { CelestialBody } from '../universe/CelestialBody';
+import { HabitableZoneRenderer } from './HabitableZoneRenderer';
+import { type CelestialBody, CelestialBodyType } from '../universe/CelestialBody';
 import type { SimulationEngine } from '../engine/SimulationEngine';
 
 interface SceneContentProps {
@@ -48,6 +49,8 @@ function SceneContent({ engine, bodies, selectedId, onSelect }: SceneContentProp
     engine.update(cappedDelta);
   });
 
+  const star = bodies.find((b) => b.type === CelestialBodyType.STAR);
+
   return (
     <>
       {/* Ambient light for minimum visibility */}
@@ -76,15 +79,24 @@ function SceneContent({ engine, bodies, selectedId, onSelect }: SceneContentProp
         makeDefault
       />
 
+      {/* Circumstellar Habitable Zone overlay (Mission P1-A) */}
+      {star && <HabitableZoneRenderer star={star} />}
+
       {/* Render all celestial bodies */}
-      {bodies.map((body) => (
-        <CelestialBodyRenderer
-          key={body.id}
-          body={body}
-          isSelected={body.id === selectedId}
-          onClick={() => onSelect(body.id)}
-        />
-      ))}
+      {bodies.map((body) => {
+        const parentBody = body.parentId
+          ? bodies.find((b) => b.id === body.parentId)
+          : undefined;
+        return (
+          <CelestialBodyRenderer
+            key={body.id}
+            body={body}
+            isSelected={body.id === selectedId}
+            onClick={() => onSelect(body.id)}
+            parentBody={parentBody}
+          />
+        );
+      })}
     </>
   );
 }

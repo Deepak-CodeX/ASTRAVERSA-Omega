@@ -7,6 +7,7 @@ export { StarRenderer } from './StarRenderer';
 export { PlanetRenderer } from './PlanetRenderer';
 export { OrbitRenderer } from './OrbitRenderer';
 export { CelestialBodyRenderer } from './CelestialBodyRenderer';
+export { HabitableZoneRenderer } from './HabitableZoneRenderer';
 
 // Mission 002 — Galaxy Rendering & Cinematic Observatory
 export {

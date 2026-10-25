@@ -13,8 +13,9 @@
 import { SimulationClock, type TimeMultiplier } from './SimulationClock';
 import { Vector3 } from '../physics/Vector3';
 import { computeGravitationalForce } from '../physics/gravity';
+import { orbitalToCartesian, type OrbitalElements } from '../physics/orbitalElements';
 import { CelestialBodyType, type CelestialBody } from '../universe/CelestialBody';
-import { G, secondsToYears } from '../astronomy/constants';
+import { G, SOLAR_MASS, secondsToYears } from '../astronomy/constants';
 import { computeStellarEvolution } from '../astronomy/stellarEvolution';
 import type { SpectralClass } from '../astronomy/stellar';
 import {
@@ -56,11 +57,23 @@ export class SimulationEngine {
     return this._bodies;
   }
 
+  /** Total number of bodies in the simulation */
+  get bodyCount(): number {
+    return this._bodies.length;
+  }
+
+  /**
+   * Find a body by unique ID in the active simulation.
+   */
+  getBody(id: string): CelestialBody | undefined {
+    return this._bodies.find((b) => b.id === id);
+  }
+
   /**
    * Initialize the engine with a set of celestial bodies.
    */
   initialize(bodies: CelestialBody[]): void {
-    this._bodies = bodies;
+    this._bodies = [...bodies];
     this._state = SimulationState.PAUSED;
     this.clock.reset();
 
@@ -269,9 +282,114 @@ export class SimulationEngine {
   /**
    * Compute and store accelerations for all bodies.
    */
-  private computeAccelerations(): void {
+  computeAccelerations(): void {
     for (let i = 0; i < this._bodies.length; i++) {
       this._bodies[i].acceleration = this.computeAccelerationForBody(i);
     }
+  }
+
+  /**
+   * Add a body to the live simulation, recomputing accelerations and coupling (Mission P1-A).
+   */
+  addBody(body: CelestialBody): void {
+    this._bodies.push(body);
+    this.computeAccelerations();
+    const star = this._bodies.find((b) => b.type === CelestialBodyType.STAR);
+    if (star) {
+      this.updatePlanetaryCoupling(star);
+    }
+  }
+
+  /**
+   * Remove a body from the live simulation, safely purging any satellites (Mission P1-A).
+   */
+  removeBody(bodyId: string): CelestialBody | null {
+    const index = this._bodies.findIndex((b) => b.id === bodyId);
+    if (index === -1) return null;
+    const [removed] = this._bodies.splice(index, 1);
+    // Also remove child satellites if a primary body was removed
+    this._bodies = this._bodies.filter((b) => b.parentId !== bodyId);
+    this.computeAccelerations();
+    return removed;
+  }
+
+  /**
+   * Recompute gravitational accelerations across all current bodies (Mission P1-A).
+   */
+  recomputeAccelerations(): void {
+    this.computeAccelerations();
+  }
+
+  /**
+   * Update the orbital parameters of a body, applying Keplerian elements
+   * to position, velocity, and dependent quantities (Mission P1-A).
+   */
+  updateBodyOrbit(bodyId: string, elements: OrbitalElements): boolean {
+    const body = this._bodies.find((b) => b.id === bodyId);
+    if (!body) return false;
+    const parentId = body.parentId ?? body.planetProperties?.parentId ?? body.moonProperties?.parentId;
+    if (!parentId) return false;
+    const parent = this._bodies.find((b) => b.id === parentId);
+    if (!parent) return false;
+
+    const mu = G * (parent.mass + body.mass);
+    const state = orbitalToCartesian(elements, mu);
+
+    body.position = parent.position.add(state.position);
+    body.velocity = parent.velocity.add(state.velocity);
+
+    if (body.planetProperties) {
+      body.planetProperties.orbitalRadius = elements.semiMajorAxis;
+      body.planetProperties.orbitalElements = { ...elements };
+      body.planetProperties.orbitalPeriod =
+        2 * Math.PI * Math.sqrt(Math.pow(elements.semiMajorAxis, 3) / mu);
+    } else if (body.moonProperties) {
+      body.moonProperties.orbitalRadius = elements.semiMajorAxis;
+      body.moonProperties.orbitalElements = { ...elements };
+      body.moonProperties.orbitalPeriod =
+        2 * Math.PI * Math.sqrt(Math.pow(elements.semiMajorAxis, 3) / mu);
+    }
+
+    this.computeAccelerations();
+    const star = this._bodies.find((b) => b.type === CelestialBodyType.STAR);
+    if (star) {
+      this.updatePlanetaryCoupling(star);
+    }
+    return true;
+  }
+
+  /**
+   * Update physical properties of a body, re-evaluating stellar evolution
+   * or planetary coupling when mass changes (Mission P1-A).
+   */
+  updateBodyProperties(
+    bodyId: string,
+    updates: { mass?: number; radius?: number; name?: string; color?: string }
+  ): boolean {
+    const body = this._bodies.find((b) => b.id === bodyId);
+    if (!body) return false;
+
+    if (updates.name !== undefined) body.name = updates.name;
+    if (updates.mass !== undefined && updates.mass > 0) body.mass = updates.mass;
+    if (updates.radius !== undefined && updates.radius > 0) body.radius = updates.radius;
+    if (updates.color !== undefined) body.color = updates.color;
+
+    // If star mass changed, re-evaluate stellar parameters & coupling
+    if (body.type === CelestialBodyType.STAR && updates.mass !== undefined) {
+      const solarMass = body.mass / SOLAR_MASS;
+      if (body.starProperties?.evolution) {
+        body.starProperties.evolution.initialMassSolar = solarMass;
+        const currentAge = body.starProperties.evolution.ageYears;
+        this.setStarAge(body, currentAge);
+      }
+    } else {
+      const star = this._bodies.find((b) => b.type === CelestialBodyType.STAR);
+      if (star) {
+        this.updatePlanetaryCoupling(star);
+      }
+    }
+
+    this.computeAccelerations();
+    return true;
   }
 }
