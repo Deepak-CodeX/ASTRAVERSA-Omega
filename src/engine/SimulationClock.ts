@@ -23,7 +23,7 @@
 /**
  * Available time multiplier values.
  */
-export const TIME_MULTIPLIERS = [0, 1, 10, 100, 1000, 1_000_000] as const;
+export const TIME_MULTIPLIERS = [0, 1, 10, 100, 1000, 10_000, 100_000, 1_000_000] as const;
 export type TimeMultiplier = typeof TIME_MULTIPLIERS[number];
 
 /**
@@ -35,6 +35,8 @@ export const TIME_MULTIPLIER_LABELS: Record<TimeMultiplier, string> = {
   10: '10×',
   100: '100×',
   1000: '1,000×',
+  10_000: '10,000×',
+  100_000: '100,000×',
   1_000_000: '1,000,000×',
 };
 

@@ -15,10 +15,12 @@
 import { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Stars } from '@react-three/drei';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { CelestialBodyRenderer } from './CelestialBodyRenderer';
 import { HabitableZoneRenderer } from './HabitableZoneRenderer';
 import { type CelestialBody, CelestialBodyType } from '../universe/CelestialBody';
 import type { SimulationEngine } from '../engine/SimulationEngine';
+import { AU, RENDER_SCALE_AU } from '../astronomy/constants';
 
 interface SceneContentProps {
   engine: SimulationEngine;
@@ -32,9 +34,10 @@ interface SceneContentProps {
  */
 function SceneContent({ engine, bodies, selectedId, onSelect }: SceneContentProps) {
   const lastTimeRef = useRef<number>(0);
+  const controlsRef = useRef<OrbitControlsImpl>(null);
 
   // Update simulation each frame
-  useFrame((state) => {
+  useFrame((state, deltaSec) => {
     const now = state.clock.getElapsedTime() * 1000; // ms
     if (lastTimeRef.current === 0) {
       lastTimeRef.current = now;
@@ -47,6 +50,33 @@ function SceneContent({ engine, bodies, selectedId, onSelect }: SceneContentProp
     // Cap wall delta to prevent huge jumps on tab switch
     const cappedDelta = Math.min(delta, 100);
     engine.update(cappedDelta);
+
+    // Smooth camera target tracking towards selected body or back to center
+    if (controlsRef.current) {
+      if (selectedId) {
+        const selectedBody = bodies.find((b) => b.id === selectedId);
+        if (selectedBody) {
+          const targetX = (selectedBody.position.x / AU) * RENDER_SCALE_AU;
+          const targetY = (selectedBody.position.y / AU) * RENDER_SCALE_AU;
+          const targetZ = (selectedBody.position.z / AU) * RENDER_SCALE_AU;
+          const lerpFactor = Math.min(1, deltaSec * 3.5);
+          controlsRef.current.target.x += (targetX - controlsRef.current.target.x) * lerpFactor;
+          controlsRef.current.target.y += (targetY - controlsRef.current.target.y) * lerpFactor;
+          controlsRef.current.target.z += (targetZ - controlsRef.current.target.z) * lerpFactor;
+          controlsRef.current.update();
+        }
+      } else if (
+        Math.abs(controlsRef.current.target.x) > 0.001 ||
+        Math.abs(controlsRef.current.target.y) > 0.001 ||
+        Math.abs(controlsRef.current.target.z) > 0.001
+      ) {
+        const lerpFactor = Math.min(1, deltaSec * 2.0);
+        controlsRef.current.target.x += (0 - controlsRef.current.target.x) * lerpFactor;
+        controlsRef.current.target.y += (0 - controlsRef.current.target.y) * lerpFactor;
+        controlsRef.current.target.z += (0 - controlsRef.current.target.z) * lerpFactor;
+        controlsRef.current.update();
+      }
+    }
   });
 
   const star = bodies.find((b) => b.type === CelestialBodyType.STAR);
@@ -54,7 +84,7 @@ function SceneContent({ engine, bodies, selectedId, onSelect }: SceneContentProp
   return (
     <>
       {/* Ambient light for minimum visibility */}
-      <ambientLight intensity={0.05} />
+      <ambientLight intensity={0.12} />
 
       {/* Background star field */}
       <Stars
@@ -67,8 +97,9 @@ function SceneContent({ engine, bodies, selectedId, onSelect }: SceneContentProp
         speed={0}
       />
 
-      {/* Camera controls */}
+      {/* Camera controls with selection tracking */}
       <OrbitControls
+        ref={controlsRef}
         enablePan
         enableZoom
         enableRotate

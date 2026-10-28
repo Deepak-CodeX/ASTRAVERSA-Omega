@@ -158,6 +158,55 @@ ASTRAVERSA Ω is developed through a series of **Missions** — focused mileston
 
 ---
 
+## ✅ Mission P1-A — SYSTEM VIEW FIDELITY & MINIMAL SYSTEM EDITOR
+### "True Orbits, Habitable Zones & System Laboratory"
+
+**Status:** ✅ Complete
+
+**Deliverables:**
+- [x] True 3D Keplerian orbit path visualization (`OrbitRenderer.tsx`) using universal conic equations and parent-relative coordinate frames.
+- [x] Circumstellar Habitable Zone 3D visual overlay (`HabitableZoneRenderer.tsx`) rendering conservative and optimistic insolation bands.
+- [x] Physically grounded natural satellite (moon) generation (`generateMoonsForPlanet`) constrained by Domingos (2006) Hill sphere stability ($a_{\text{moon}} \le 0.49 r_H$).
+- [x] Minimal System Editor (`SystemEditor.tsx`) allowing interactive inspection and editing of celestial bodies.
+- [x] Unit test suites for orbit geometry, moon generation, and system editing (19 files, 288 tests passing).
+
+---
+
+## ✅ Mission P1-B — LIVING SOLAR SYSTEM, INTERACTIVE ORBITAL DYNAMICS & SIMULATION INTEGRITY
+### "Simulation Dynamics, Per-Frame 60 FPS Motion, Visual Scale Calibration & Satellite Invariance"
+
+**Status:** ✅ Complete
+
+**Problem Addressed:**
+- The system view previously appeared static and jumpy because Three.js meshes only updated when React re-rendered every 250ms, while real-time 1× multiplier made orbital motion appear completely frozen.
+- Visual hierarchy was inverted: concentric orbit rings and habitable zone bands overpowered celestial bodies, while planets were rendered at near-subpixel scales.
+- Moons in the system editor previously had their semi-major axis falsely validated against the central star collision radius ($1.5 R_\odot$), causing every moon edit to be rejected.
+- When a planet's orbit was moved, child satellites were left stranded in empty space, causing orbital desynchronization.
+- Non-star mass inputs formatted with `.toFixed(2)` truncated lightweight moons ($< 0.005 M_\oplus$) to `0.00`, blocking editing.
+
+**Implemented Behavior:**
+- [x] **Per-Frame 60 FPS Three.js Motion:** Added `useFrame` group position synchronization across `PlanetRenderer.tsx`, `StarRenderer.tsx`, and `CelestialBodyRenderer.tsx` (Moons), decoupling visual fluidity from React re-renders and delivering smooth 60 FPS orbital motion driven by the underlying Verlet/Symplectic integrator.
+- [x] **Calibrated Astronomical Visual Hierarchy:** Scaled celestial spheres using logarithmic perceptual scaling ($R_{\mathrm{visual}} = 0.22 + 0.12 \log_2(\max(R/R_\oplus, 0.25))$) so Earth-sized and gas giant planets appear as prominent, distinguishable 3D worlds rather than invisible sub-pixel dots. Added physical day/night hemisphere lighting and atmospheric scattering shells.
+- [x] **Radiant Stellar Core & Corona:** Enhanced `StarRenderer.tsx` with multi-layered solar corona radiance, luminous chromatic glow, and point light illumination calibrated for realistic planetary shading.
+- [x] **Restrained Celestial Guide Rings:** Reduced opacity of non-selected planetary orbit rings (to 0.16), moon orbit lines (to 0.18), and circumstellar Habitable Zone bands (to 0.035 conservative, 0.015 optimistic) so geometric reference lines no longer overpower celestial bodies.
+- [x] **Expanded Simulation Time Multipliers:** Added `10,000×` and `100,000×` speed tiers to `SimulationClock.ts` and UI controls (`App.tsx`), setting initial system view speed to `10,000×` (~2.7 hours/sec) for immediately observable, majestic orbital motion.
+- [x] **Dynamic Camera Focus Tracking:** Enhanced `Scene.tsx` OrbitControls with smooth target lerping toward selected celestial bodies, providing cinematic tracking as bodies orbit their host star.
+- [x] **Rigid Satellite Translation Invariance:** In `SimulationEngine.ts:updateBodyOrbit`, when a planet's orbit elements change, all child satellites (`child.parentId === body.id`) are rigidly translated by $\Delta \mathbf{r} = \mathbf{r}_{\mathrm{new}} - \mathbf{r}_{\mathrm{old}}$ and $\Delta \mathbf{v} = \mathbf{v}_{\mathrm{new}} - \mathbf{v}_{\mathrm{old}}$, preserving their exact relative Keplerian orbits ($0\text{ km}$ drift).
+- [x] **Moon Orbit & Hill Sphere Validation:** In `SystemEditor.tsx`, moon orbits are validated against parent planet collision boundaries ($a > 1.5 R_p$) and Domingos et al. (2006) Hill stability ($a_{\mathrm{moon}} \le 0.49 r_H$), rejecting unphysical orbits atomically with informative error banners.
+- [x] **Interactive Natural Satellite Generation:** Added `+ ADD MOON TO PLANET` in `SystemEditor.tsx` to spawn dynamically stable moons with high-precision mass formatting (`toPrecision(4)`).
+- [x] **Scientifically Coupled Planet Creation:** Newly created planets compute bolometric insolation flux, equilibrium temperature, habitability status, and 1D semi-grey planetary environments derived directly from host star luminosity and orbital distance.
+- [x] **Expanded Test Suite:** Added unit and analytical tests across `tests/simulationClock.test.ts` and `tests/systemEditor.test.ts` (19 test files, 293 tests passing, 100% pass rate).
+- [x] **Full Verification Passed:** TypeScript (`tsc -b`), linter (`oxlint`), production build (`npm run build`), and live Chrome DevTools runtime inspection passed cleanly.
+
+**Known Limitations:**
+- N-body gravitational perturbation on moons at extreme time multipliers ($1,000,000\times$) can induce numerical drift over simulation decades; analytic Keplerian rail fallback is planned for extreme time compression.
+- Visual rings for multi-satellite systems currently render in parent-centered coordinate space without hierarchical multi-body tidal resonance locking.
+
+**Next Milestone:**
+- Mission 005B — Planetary Surfaces & Geology (Procedural surface shaders, heightmaps, and atmospheric scattering).
+
+---
+
 ## 🔮 Mission 005B — PLANETARY SURFACES & GEOLOGY
 ### "Terrain, Crustal Dynamics & Surface Visualization"
 

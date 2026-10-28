@@ -332,11 +332,30 @@ export class SimulationEngine {
     const parent = this._bodies.find((b) => b.id === parentId);
     if (!parent) return false;
 
+    const oldPosition = body.position.clone();
+    const oldVelocity = body.velocity.clone();
+
     const mu = G * (parent.mass + body.mass);
     const state = orbitalToCartesian(elements, mu);
 
     body.position = parent.position.add(state.position);
     body.velocity = parent.velocity.add(state.velocity);
+
+    // If this body has orbiting satellites (e.g. moons orbiting a planet),
+    // preserve their relative orbital positions and velocities around this body
+    // by translating them rigidly by deltaPos and deltaVel.
+    const deltaPos = body.position.subtract(oldPosition);
+    const deltaVel = body.velocity.subtract(oldVelocity);
+
+    for (const child of this._bodies) {
+      if (
+        child.parentId === body.id ||
+        child.moonProperties?.parentId === body.id
+      ) {
+        child.position = child.position.add(deltaPos);
+        child.velocity = child.velocity.add(deltaVel);
+      }
+    }
 
     if (body.planetProperties) {
       body.planetProperties.orbitalRadius = elements.semiMajorAxis;

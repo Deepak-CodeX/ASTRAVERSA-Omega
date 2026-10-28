@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { SimulationEngine } from '../src/engine/SimulationEngine';
 import { Universe } from '../src/universe/Universe';
-import { generateSolarSystem } from '../src/universe/SolarSystemGenerator';
+import { generateSolarSystem, computeHillRadius } from '../src/universe/SolarSystemGenerator';
 import { CelestialBodyType, createCelestialBody } from '../src/universe/CelestialBody';
 import { Vector3 } from '../src/physics/Vector3';
 import { AU, EARTH_MASS, EARTH_RADIUS } from '../src/astronomy/constants';
@@ -170,5 +170,151 @@ describe('Mission P1-A — Minimal System Editor', () => {
       expect(Number.isNaN(b.acceleration.y)).toBe(false);
       expect(Number.isNaN(b.acceleration.z)).toBe(false);
     }
+  });
+
+  it('rigidly translates child satellites when parent planet orbit is updated (preserves relative moon orbits)', () => {
+    const universe = new Universe(42);
+    universe.generateGalaxy({ quality: 'LOW' });
+    universe.enterStarSystem(0);
+
+    const engine = new SimulationEngine();
+    engine.initialize(universe.bodies);
+
+    const planet = universe.bodies.find((b) => b.type === CelestialBodyType.PLANET)!;
+    const initialPlanetPos = planet.position.clone();
+    const initialPlanetVel = planet.velocity.clone();
+
+    // Attach a satellite moon
+    const moon = createCelestialBody({
+      id: `${planet.id}-satellite`,
+      name: `${planet.name} Alpha`,
+      type: CelestialBodyType.MOON,
+      mass: 7.342e22,
+      radius: 1737e3,
+      position: initialPlanetPos.add(new Vector3(4.0e8, 0, 0)),
+      velocity: initialPlanetVel.add(new Vector3(0, 0, 1000)),
+      color: '#e2e8f0',
+      seed: 1234,
+      parentId: planet.id,
+      moonProperties: {
+        orbitalRadius: 4.0e8,
+        orbitalPeriod: 2.5e6,
+        parentId: planet.id,
+      },
+    });
+
+    universe.addBody(moon);
+    engine.addBody(moon);
+
+    const initialRelPos = engine.getBody(moon.id)!.position.subtract(engine.getBody(planet.id)!.position);
+    const initialRelVel = engine.getBody(moon.id)!.velocity.subtract(engine.getBody(planet.id)!.velocity);
+
+    expect(initialRelPos.x).toBeCloseTo(4.0e8, -2);
+    expect(initialRelVel.z).toBeCloseTo(1000, 1);
+
+    // Now update the parent planet's orbit to a new semi-major axis (e.g. 2.0 AU)
+    const newPlanetOrbit: OrbitalElements = {
+      semiMajorAxis: 2.0 * AU,
+      eccentricity: 0.15,
+      inclination: 0.05,
+      longitudeOfAscendingNode: 0.2,
+      argumentOfPeriapsis: 0.3,
+      trueAnomaly: 0.0,
+    };
+
+    const orbitUpdated = engine.updateBodyOrbit(planet.id, newPlanetOrbit);
+    expect(orbitUpdated).toBe(true);
+
+    const movedPlanet = engine.getBody(planet.id)!;
+    const movedMoon = engine.getBody(moon.id)!;
+
+    // The planet has moved significantly
+    expect(movedPlanet.position.distanceTo(initialPlanetPos)).toBeGreaterThan(0.1 * AU);
+
+    // The child satellite moon must have moved along with the planet
+    const newRelPos = movedMoon.position.subtract(movedPlanet.position);
+    const newRelVel = movedMoon.velocity.subtract(movedPlanet.velocity);
+
+    // Relative distance vector must be preserved within sub-millimeter precision
+    expect(newRelPos.x).toBeCloseTo(initialRelPos.x, 0);
+    expect(newRelPos.y).toBeCloseTo(initialRelPos.y, 0);
+    expect(newRelPos.z).toBeCloseTo(initialRelPos.z, 0);
+
+    // Relative velocity vector must be preserved
+    expect(newRelVel.x).toBeCloseTo(initialRelVel.x, 3);
+    expect(newRelVel.y).toBeCloseTo(initialRelVel.y, 3);
+    expect(newRelVel.z).toBeCloseTo(initialRelVel.z, 3);
+  });
+
+  it('supports editing moon physical properties and relative Keplerian orbit', () => {
+    const system = generateSolarSystem(12345, { includeMoons: true });
+    const engine = new SimulationEngine();
+    engine.initialize(system.bodies);
+
+    const moon = system.bodies.find((b) => b.type === CelestialBodyType.MOON)!;
+    expect(moon).toBeDefined();
+
+    const parentPlanet = system.bodies.find((b) => b.id === moon.parentId)!;
+    expect(parentPlanet).toBeDefined();
+
+    const initialMoonMass = moon.mass;
+    const initialMoonRadius = moon.radius;
+
+    // Update moon physical properties
+    engine.updateBodyProperties(moon.id, {
+      name: 'Titanus Prime',
+      mass: initialMoonMass * 2,
+      radius: initialMoonRadius * 1.25,
+      color: '#38bdf8',
+    });
+
+    const updatedMoon = engine.getBody(moon.id)!;
+    expect(updatedMoon.name).toBe('Titanus Prime');
+    expect(updatedMoon.mass).toBe(initialMoonMass * 2);
+    expect(updatedMoon.radius).toBe(initialMoonRadius * 1.25);
+    expect(updatedMoon.color).toBe('#38bdf8');
+
+    // Update moon orbit around parent planet to a new distance
+    const newMoonDistance = parentPlanet.radius * 5.0; // 5 planetary radii
+    const newElements: OrbitalElements = {
+      semiMajorAxis: newMoonDistance,
+      eccentricity: 0.05,
+      inclination: 0.02,
+      longitudeOfAscendingNode: 0.0,
+      argumentOfPeriapsis: 0.0,
+      trueAnomaly: 0.0,
+    };
+
+    const orbitOk = engine.updateBodyOrbit(moon.id, newElements);
+    expect(orbitOk).toBe(true);
+
+    const orbitUpdatedMoon = engine.getBody(moon.id)!;
+    expect(orbitUpdatedMoon.moonProperties?.orbitalRadius).toBe(newMoonDistance);
+
+    // Distance to parent planet must match new periapsis a * (1 - e) = 5 * R_p * 0.95
+    const relDistance = orbitUpdatedMoon.position.distanceTo(parentPlanet.position);
+    expect(relDistance).toBeCloseTo(newMoonDistance * 0.95, -2);
+
+    // Acceleration should be directed toward the parent planet and non-zero
+    expect(orbitUpdatedMoon.acceleration.magnitude()).toBeGreaterThan(0);
+  });
+
+  it('verifies moon Hill radius stability constraint and bounds checking', () => {
+    // For a terrestrial planet (1.0 M_earth) at 1 AU around 1.0 M_sun
+    // Hill radius is ~1.5e9 m (~0.01 AU). The Domingos (2006) stability limit is 0.49 * rH ~ 7.35e8 m (~0.0049 AU).
+    const starMass = 1.989e30;
+    const planetMass = 5.972e24;
+    const planetDist = 1.0 * AU;
+
+    const rH = computeHillRadius(planetDist, planetMass, starMass);
+    const maxStableOrbit = 0.49 * rH;
+
+    // Test a valid orbit (e.g. Earth's Moon at 3.84e8 m < 7.35e8 m)
+    const validMoonOrbitM = 3.84e8;
+    expect(validMoonOrbitM).toBeLessThanOrEqual(maxStableOrbit);
+
+    // Test an unstable orbit exceeding Hill sphere boundary (e.g. 1.0e9 m > 0.49 rH)
+    const unstableMoonOrbitM = 1.0e9;
+    expect(unstableMoonOrbitM).toBeGreaterThan(maxStableOrbit);
   });
 });

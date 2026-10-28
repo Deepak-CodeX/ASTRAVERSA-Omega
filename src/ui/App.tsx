@@ -309,7 +309,7 @@ export function App() {
     const system = universe.enterStarSystem(selectedStarIndex);
     if (system) {
       engine.initialize(system.bodies);
-      engine.start(1);
+      engine.start(10_000);
       setViewLevel(ViewLevel.SYSTEM);
       setSelectedBodyId(system.bodies[0]?.id ?? null);
       setTick(t => t + 1);
@@ -370,6 +370,14 @@ export function App() {
         }
       }
     }
+    // Synchronize all body positions and velocities from engine to universe
+    for (const eb of engine.bodies) {
+      const ub = universe.findBody(eb.id);
+      if (ub) {
+        ub.position = eb.position.clone();
+        ub.velocity = eb.velocity.clone();
+      }
+    }
     setTick(t => t + 1);
   }, [engine, universe]);
 
@@ -397,7 +405,7 @@ export function App() {
         const system = universe.enterStarSystem(starIndex);
         if (system) {
           engine.initialize(system.bodies);
-          engine.start(1);
+          engine.start(10_000);
           setViewLevel(ViewLevel.SYSTEM);
           setSelectedBodyId(system.bodies[0]?.id ?? null);
           setTick(t => t + 1);
@@ -534,6 +542,7 @@ export function App() {
           allBodies={universe.bodies}
           onApplyBodyEdits={handleApplyBodyEdits}
           onAddPlanet={handleAddPlanet}
+          onAddMoon={handleAddPlanet}
           onDeleteBody={handleDeleteBody}
           onClose={() => setIsEditorOpen(false)}
         />

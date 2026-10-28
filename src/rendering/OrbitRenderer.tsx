@@ -5,16 +5,18 @@
  * or circular reference ring.
  *
  * Mathematically derived from the simulation's orbital elements and state vectors:
- * - Solves Keplerian trail points using computeOrbitTrailPoints() in the simulation frame.
- * - Supports eccentric orbits (e > 0) and 3D inclination.
- * - Centers the orbit on the parent body (star for planets, planet for moons).
- * - Fallbacks safely to circular ring if elements are unavailable or degenerate.
+ * - Solves Keplerian trail points using computeOrbitTrailPoints() relative to parent focus.
+ * - Supports eccentric orbits (0 <= e < 0.99) and 3D inclination.
+ * - Parent-relative coordinate frame: orbits are centered on parent body via group transform.
+ * - Restrained visual treatment ensuring orbital lines do not visually overpower planets.
  *
  * This component only handles visualization — no simulation logic.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
+import type { Group } from 'three';
 import { BufferGeometry, Float32BufferAttribute, LineBasicMaterial, LineLoop } from 'three';
+import { useFrame } from '@react-three/fiber';
 import type { CelestialBody } from '../universe/CelestialBody';
 import { CelestialBodyType } from '../universe/CelestialBody';
 import { RENDER_SCALE_AU, AU, G } from '../astronomy/constants';
@@ -33,15 +35,25 @@ interface OrbitRendererProps {
 const ORBIT_SEGMENTS = 128;
 
 export function OrbitRenderer({ body, isSelected, parentBody }: OrbitRendererProps) {
+  const groupRef = useRef<Group>(null);
   const isMoon = body.type === CelestialBodyType.MOON;
   const orbitalRadius = body.planetProperties?.orbitalRadius ?? body.moonProperties?.orbitalRadius;
+
+  // Track parent body position per-frame (essential for moons orbiting moving planets)
+  useFrame(() => {
+    if (groupRef.current && parentBody) {
+      const px = (parentBody.position.x / AU) * RENDER_SCALE_AU;
+      const py = (parentBody.position.y / AU) * RENDER_SCALE_AU;
+      const pz = (parentBody.position.z / AU) * RENDER_SCALE_AU;
+      groupRef.current.position.set(px, py, pz);
+    }
+  });
 
   const lineLoop = useMemo(() => {
     if (!orbitalRadius && !body.planetProperties && !body.moonProperties) {
       return null;
     }
 
-    const parentPos = parentBody?.position ?? { x: 0, y: 0, z: 0 };
     const parentMass = parentBody?.mass ?? 0;
     const points: number[] = [];
 
@@ -56,30 +68,27 @@ export function OrbitRenderer({ body, isSelected, parentBody }: OrbitRendererPro
       elements = cartesianToOrbital(relPos, relVel, mu);
     }
 
-    // If valid bound elliptical elements exist (0 <= e < 1 and a > 0), render true Keplerian curve
+    // If valid bound elliptical elements exist (0 <= e < 0.99 and a > 0), render true Keplerian curve
     if (elements && elements.eccentricity >= 0 && elements.eccentricity < 0.99 && elements.semiMajorAxis > 0) {
       const mu = G * ((parentMass > 0 ? parentMass : 1.989e30) + body.mass);
       const trailPoints = computeOrbitTrailPoints(elements, mu, ORBIT_SEGMENTS);
 
       for (const p of trailPoints) {
-        const sceneX = ((parentPos.x + p.x) / AU) * RENDER_SCALE_AU;
-        const sceneY = ((parentPos.y + p.y) / AU) * RENDER_SCALE_AU;
-        const sceneZ = ((parentPos.z + p.z) / AU) * RENDER_SCALE_AU;
+        const sceneX = (p.x / AU) * RENDER_SCALE_AU;
+        const sceneY = (p.y / AU) * RENDER_SCALE_AU;
+        const sceneZ = (p.z / AU) * RENDER_SCALE_AU;
         points.push(sceneX, sceneY, sceneZ);
       }
     } else if (orbitalRadius && orbitalRadius > 0) {
-      // Safe fallback: planar circular ring centered on parent
+      // Safe fallback: planar circular ring relative to parent origin
       const sceneRadius = (orbitalRadius / AU) * RENDER_SCALE_AU;
-      const parentSceneX = (parentPos.x / AU) * RENDER_SCALE_AU;
-      const parentSceneY = (parentPos.y / AU) * RENDER_SCALE_AU;
-      const parentSceneZ = (parentPos.z / AU) * RENDER_SCALE_AU;
 
       for (let i = 0; i < ORBIT_SEGMENTS; i++) {
         const angle = (i / ORBIT_SEGMENTS) * Math.PI * 2;
         points.push(
-          parentSceneX + Math.cos(angle) * sceneRadius,
-          parentSceneY,
-          parentSceneZ + Math.sin(angle) * sceneRadius
+          Math.cos(angle) * sceneRadius,
+          0,
+          Math.sin(angle) * sceneRadius
         );
       }
     } else {
@@ -89,13 +98,14 @@ export function OrbitRenderer({ body, isSelected, parentBody }: OrbitRendererPro
     const geom = new BufferGeometry();
     geom.setAttribute('position', new Float32BufferAttribute(points, 3));
 
+    // Refined restrained color palette: subtle astronomical guides that do not compete with bodies
     const color = isMoon
-      ? (isSelected ? '#c084fc' : '#4f46e5')
+      ? (isSelected ? '#c084fc' : '#6366f1')
       : (isSelected ? '#38bdf8' : '#334466');
 
     const opacity = isMoon
-      ? (isSelected ? 0.75 : 0.3)
-      : (isSelected ? 0.8 : 0.28);
+      ? (isSelected ? 0.75 : 0.18)
+      : (isSelected ? 0.80 : 0.16);
 
     const mat = new LineBasicMaterial({
       color,
@@ -106,20 +116,11 @@ export function OrbitRenderer({ body, isSelected, parentBody }: OrbitRendererPro
 
     return new LineLoop(geom, mat);
   }, [
-    body.position.x,
-    body.position.y,
-    body.position.z,
-    body.velocity.x,
-    body.velocity.y,
-    body.velocity.z,
     body.mass,
     body.planetProperties?.orbitalRadius,
     body.moonProperties?.orbitalRadius,
     body.planetProperties?.orbitalElements,
     body.moonProperties?.orbitalElements,
-    parentBody?.position.x,
-    parentBody?.position.y,
-    parentBody?.position.z,
     parentBody?.mass,
     isSelected,
     isMoon,
@@ -128,5 +129,13 @@ export function OrbitRenderer({ body, isSelected, parentBody }: OrbitRendererPro
 
   if (!lineLoop) return null;
 
-  return <primitive object={lineLoop} />;
+  const initialParentX = ((parentBody?.position.x ?? 0) / AU) * RENDER_SCALE_AU;
+  const initialParentY = ((parentBody?.position.y ?? 0) / AU) * RENDER_SCALE_AU;
+  const initialParentZ = ((parentBody?.position.z ?? 0) / AU) * RENDER_SCALE_AU;
+
+  return (
+    <group ref={groupRef} position={[initialParentX, initialParentY, initialParentZ]}>
+      <primitive object={lineLoop} />
+    </group>
+  );
 }

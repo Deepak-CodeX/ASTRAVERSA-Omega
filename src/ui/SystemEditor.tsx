@@ -18,10 +18,21 @@ import {
   EARTH_MASS,
   EARTH_RADIUS,
   AU,
+  G,
 } from '../astronomy/constants';
 import { getPlanetType, circularOrbitalVelocity, orbitalPeriod } from '../astronomy/planetary';
 import { Vector3 } from '../physics/Vector3';
 import type { OrbitalElements } from '../physics/orbitalElements';
+import { computeHillRadius } from '../universe/SolarSystemGenerator';
+import {
+  computeHabitableZone,
+  computeEquilibriumTemperature,
+  computeInsolationFlux,
+  computeRelativeInsolation,
+  classifyHabitability,
+  getDefaultBondAlbedo,
+} from '../astronomy/stellarPlanetaryCoupling';
+import { computePlanetaryEnvironment } from '../astronomy/planetaryEnvironment';
 
 interface SystemEditorProps {
   selectedBody: CelestialBody | null;
@@ -32,6 +43,7 @@ interface SystemEditorProps {
     orbitalUpdates?: OrbitalElements
   ) => void;
   onAddPlanet: (newPlanet: CelestialBody) => void;
+  onAddMoon?: (newMoon: CelestialBody) => void;
   onDeleteBody: (bodyId: string) => void;
   onClose: () => void;
 }
@@ -51,6 +63,7 @@ export function SystemEditor({
   allBodies,
   onApplyBodyEdits,
   onAddPlanet,
+  onAddMoon,
   onDeleteBody,
   onClose,
 }: SystemEditorProps) {
@@ -68,12 +81,18 @@ export function SystemEditor({
     }
 
     const isStar = selectedBody.type === CelestialBodyType.STAR;
+    const isMoon = selectedBody.type === CelestialBodyType.MOON;
+
     const massValue = isStar
       ? (selectedBody.mass / SOLAR_MASS).toFixed(3)
+      : isMoon
+      ? (selectedBody.mass / EARTH_MASS).toPrecision(4)
       : (selectedBody.mass / EARTH_MASS).toFixed(2);
 
     const radiusValue = isStar
       ? (selectedBody.radius / SOLAR_RADIUS).toFixed(3)
+      : isMoon
+      ? (selectedBody.radius / EARTH_RADIUS).toPrecision(4)
       : (selectedBody.radius / EARTH_RADIUS).toFixed(2);
 
     const orbitalRadiusAU = selectedBody.planetProperties
@@ -107,6 +126,7 @@ export function SystemEditor({
 
   const isStar = selectedBody.type === CelestialBodyType.STAR;
   const isPlanet = selectedBody.type === CelestialBodyType.PLANET;
+  const isMoon = selectedBody.type === CelestialBodyType.MOON;
 
   const handleApply = () => {
     const massNum = parseFloat(draft.massInput);
@@ -149,9 +169,33 @@ export function SystemEditor({
       }
 
       const aMeters = semiMajorAU * AU;
-      if (star && aMeters <= star.radius * 1.5) {
-        setValidationError('Orbit cannot be inside the stellar radius.');
-        return;
+
+      if (isPlanet) {
+        if (star && aMeters <= star.radius * 1.5) {
+          setValidationError('Orbit cannot be inside the stellar radius.');
+          return;
+        }
+      } else if (isMoon) {
+        const parentId = selectedBody.parentId ?? selectedBody.moonProperties?.parentId;
+        const parentPlanet = allBodies.find((b) => b.id === parentId);
+        if (parentPlanet) {
+          if (aMeters <= parentPlanet.radius * 1.5) {
+            setValidationError('Moon orbit cannot be inside the parent planet radius.');
+            return;
+          }
+          if (star) {
+            const planetSemiMajor =
+              parentPlanet.planetProperties?.orbitalRadius ?? parentPlanet.position.magnitude();
+            const rH = computeHillRadius(planetSemiMajor, parentPlanet.mass, star.mass);
+            const maxStableRadius = 0.49 * rH;
+            if (rH > 0 && aMeters > maxStableRadius) {
+              setValidationError(
+                `Moon orbit (${semiMajorAU.toFixed(5)} AU) exceeds Hill sphere stability limit (${(maxStableRadius / AU).toFixed(5)} AU, 0.49 r_H).`
+              );
+              return;
+            }
+          }
+        }
       }
 
       const existingElements =
@@ -202,6 +246,25 @@ export function SystemEditor({
     const vCirc = circularOrbitalVelocity(star.mass, newDistM);
     const period = orbitalPeriod(star.mass, newDistM);
 
+    const starLuminosity = star.starProperties?.luminosity ?? 3.828e26;
+    const albedo = getDefaultBondAlbedo(planetType);
+    const insolationFlux = computeInsolationFlux(starLuminosity, newDistM);
+    const insolationRelative = computeRelativeInsolation(insolationFlux);
+    const equilibriumTemperature = computeEquilibriumTemperature(starLuminosity, newDistM, albedo);
+    const hz =
+      star.starProperties?.habitableZone ??
+      computeHabitableZone(starLuminosity, star.starProperties?.temperature ?? 5780);
+    const habitabilityStatus = classifyHabitability(newDistM, hz);
+
+    const environment = computePlanetaryEnvironment({
+      planetType,
+      massKg: newMassKg,
+      radiusMeters: newRadiusM,
+      luminosityWatts: starLuminosity,
+      orbitalDistanceMeters: newDistM,
+      albedo,
+    });
+
     const newId = `planet-${Date.now()}`;
     const newPlanet = createCelestialBody({
       id: newId,
@@ -227,15 +290,99 @@ export function SystemEditor({
           argumentOfPeriapsis: 0.0,
           trueAnomaly: 0.0,
         },
-        albedo: 0.3,
-        equilibriumTemperature: 250,
-        insolationFlux: 1361 / (newDistAU * newDistAU),
-        insolationRelative: 1 / (newDistAU * newDistAU),
-        habitabilityStatus: 'TOO_COLD',
+        albedo,
+        equilibriumTemperature,
+        insolationFlux,
+        insolationRelative,
+        habitabilityStatus,
+        environment,
       },
     });
 
     onAddPlanet(newPlanet);
+  };
+
+  const handleCreateNewMoon = () => {
+    if (!isPlanet || !selectedBody || !star) return;
+
+    const parentPlanet = selectedBody;
+    const pp = parentPlanet.planetProperties;
+    const parentSemiMajor = pp?.orbitalRadius ?? parentPlanet.position.magnitude();
+    const rH = computeHillRadius(parentSemiMajor, parentPlanet.mass, star.mass);
+    const rMin = Math.max(3 * parentPlanet.radius, 50_000_000);
+    const rMax = 0.35 * rH;
+
+    if (rH <= 0 || rMin >= rMax) {
+      setValidationError('Planet Hill sphere is too small or compressed to host a stable moon.');
+      return;
+    }
+
+    const existingMoons = allBodies.filter(
+      (b) =>
+        b.type === CelestialBodyType.MOON &&
+        (b.parentId === parentPlanet.id || b.moonProperties?.parentId === parentPlanet.id)
+    );
+
+    let nextDistanceM = rMin * 1.5;
+    if (existingMoons.length > 0) {
+      let maxMoonDist = 0;
+      for (const m of existingMoons) {
+        const d = m.moonProperties?.orbitalRadius ?? 0;
+        if (d > maxMoonDist) maxMoonDist = d;
+      }
+      nextDistanceM = Math.min(maxMoonDist * 1.4 + 20_000_000, rMax * 0.95);
+      if (nextDistanceM <= maxMoonDist) {
+        nextDistanceM = (maxMoonDist + rMax) * 0.5;
+      }
+    }
+
+    const moonMass = parentPlanet.mass * 5e-5;
+    const density = 3000;
+    const moonVolume = moonMass / density;
+    const moonRadius = Math.cbrt((3 * moonVolume) / (4 * Math.PI));
+
+    const mu = G * (parentPlanet.mass + moonMass);
+    const period = 2 * Math.PI * Math.sqrt(Math.pow(nextDistanceM, 3) / mu);
+    const vCircular = Math.sqrt((G * parentPlanet.mass) / nextDistanceM);
+
+    const relPos = new Vector3(nextDistanceM, 0, 0);
+    const relVel = new Vector3(0, 0, vCircular);
+
+    const moonLetters = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+    const suffix = moonLetters[existingMoons.length] ?? `${existingMoons.length + 1}`;
+    const newMoonId = `moon-${parentPlanet.id}-${Date.now()}`;
+
+    const newMoon = createCelestialBody({
+      id: newMoonId,
+      name: `${parentPlanet.name} ${suffix}`,
+      type: CelestialBodyType.MOON,
+      mass: moonMass,
+      radius: moonRadius,
+      position: parentPlanet.position.add(relPos),
+      velocity: parentPlanet.velocity.add(relVel),
+      color: '#cbd5e1',
+      seed: Math.floor(Math.random() * 100000),
+      parentId: parentPlanet.id,
+      moonProperties: {
+        orbitalRadius: nextDistanceM,
+        orbitalPeriod: period,
+        parentId: parentPlanet.id,
+        orbitalElements: {
+          semiMajorAxis: nextDistanceM,
+          eccentricity: 0.0,
+          inclination: 0.0,
+          longitudeOfAscendingNode: 0.0,
+          argumentOfPeriapsis: 0.0,
+          trueAnomaly: 0.0,
+        },
+      },
+    });
+
+    if (onAddMoon) {
+      onAddMoon(newMoon);
+    } else {
+      onAddPlanet(newMoon);
+    }
   };
 
   return (
@@ -266,12 +413,12 @@ export function SystemEditor({
       {/* Mass Input */}
       <div style={styles.fieldGroup}>
         <label style={styles.label}>
-          Mass ({isStar ? 'M☉' : 'M⊕'})
+          Mass ({isStar ? 'M☉' : isMoon ? 'M⊕' : 'M⊕'})
         </label>
         <input
           style={styles.textInput}
           type="number"
-          step={isStar ? '0.05' : '0.1'}
+          step={isStar ? '0.05' : isMoon ? '0.0001' : '0.1'}
           value={draft.massInput}
           onChange={(e) => setDraft({ ...draft, massInput: e.target.value })}
         />
@@ -280,12 +427,12 @@ export function SystemEditor({
       {/* Radius Input */}
       <div style={styles.fieldGroup}>
         <label style={styles.label}>
-          Radius ({isStar ? 'R☉' : 'R⊕'})
+          Radius ({isStar ? 'R☉' : isMoon ? 'R⊕' : 'R⊕'})
         </label>
         <input
           style={styles.textInput}
           type="number"
-          step="0.05"
+          step={isStar ? '0.05' : isMoon ? '0.0001' : '0.05'}
           value={draft.radiusInput}
           onChange={(e) => setDraft({ ...draft, radiusInput: e.target.value })}
         />
@@ -303,7 +450,7 @@ export function SystemEditor({
             <input
               style={styles.textInput}
               type="number"
-              step="0.05"
+              step={isMoon ? '0.0005' : '0.05'}
               value={draft.semiMajorAxisAUInput}
               onChange={(e) => setDraft({ ...draft, semiMajorAxisAUInput: e.target.value })}
             />
@@ -362,6 +509,12 @@ export function SystemEditor({
         <button style={styles.addPlanetButton} onClick={handleCreateNewPlanet}>
           + ADD NEW PLANET
         </button>
+
+        {isPlanet && (
+          <button style={styles.addMoonButton} onClick={handleCreateNewMoon}>
+            + ADD MOON TO PLANET
+          </button>
+        )}
 
         {!isStar && (
           <button
@@ -513,6 +666,17 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(16, 185, 129, 0.15)',
     border: '1px solid rgba(16, 185, 129, 0.45)',
     color: '#34d399',
+    padding: '7px 0',
+    borderRadius: 6,
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: 1,
+    cursor: 'pointer',
+  },
+  addMoonButton: {
+    background: 'rgba(168, 85, 247, 0.15)',
+    border: '1px solid rgba(168, 85, 247, 0.45)',
+    color: '#c084fc',
     padding: '7px 0',
     borderRadius: 6,
     fontSize: 11,

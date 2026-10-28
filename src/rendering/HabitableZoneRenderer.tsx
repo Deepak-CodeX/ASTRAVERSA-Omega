@@ -85,10 +85,10 @@ export function HabitableZoneRenderer({ star }: HabitableZoneRendererProps) {
   const boundaryRings = useMemo(() => {
     if (!isValid) return null;
     return {
-      innerOpt: createBoundaryRing(innerOptScene, '#06b6d4', 0.2),
-      innerCons: createBoundaryRing(innerConsScene, '#10b981', 0.45),
-      outerCons: createBoundaryRing(outerConsScene, '#10b981', 0.45),
-      outerOpt: createBoundaryRing(outerOptScene, '#06b6d4', 0.2),
+      innerOpt: createBoundaryRing(innerOptScene, '#06b6d4', 0.08),
+      innerCons: createBoundaryRing(innerConsScene, '#10b981', 0.18),
+      outerCons: createBoundaryRing(outerConsScene, '#10b981', 0.18),
+      outerOpt: createBoundaryRing(outerOptScene, '#06b6d4', 0.08),
     };
   }, [isValid, innerOptScene, innerConsScene, outerConsScene, outerOptScene]);
 
@@ -102,7 +102,7 @@ export function HabitableZoneRenderer({ star }: HabitableZoneRendererProps) {
         <meshBasicMaterial
           color="#10b981"
           transparent
-          opacity={0.09}
+          opacity={0.035}
           side={DoubleSide}
           depthWrite={false}
         />
@@ -115,7 +115,7 @@ export function HabitableZoneRenderer({ star }: HabitableZoneRendererProps) {
           <meshBasicMaterial
             color="#06b6d4"
             transparent
-            opacity={0.035}
+            opacity={0.015}
             side={DoubleSide}
             depthWrite={false}
           />
@@ -129,7 +129,7 @@ export function HabitableZoneRenderer({ star }: HabitableZoneRendererProps) {
           <meshBasicMaterial
             color="#06b6d4"
             transparent
-            opacity={0.035}
+            opacity={0.015}
             side={DoubleSide}
             depthWrite={false}
           />

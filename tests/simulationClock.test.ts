@@ -65,6 +65,22 @@ describe('SimulationClock', () => {
       expect(clock.simulationTime).toBeCloseTo(1000, 5);
     });
 
+    it('advances at 10,000× speed', () => {
+      const clock = new SimulationClock();
+      clock.resume(10_000);
+
+      clock.tick(1000);
+      expect(clock.simulationTime).toBeCloseTo(10_000, 5);
+    });
+
+    it('advances at 100,000× speed', () => {
+      const clock = new SimulationClock();
+      clock.resume(100_000);
+
+      clock.tick(1000);
+      expect(clock.simulationTime).toBeCloseTo(100_000, 5);
+    });
+
     it('advances at 1,000,000× speed', () => {
       const clock = new SimulationClock();
       clock.resume(1_000_000);
