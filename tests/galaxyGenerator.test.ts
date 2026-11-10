@@ -61,7 +61,9 @@ describe('Galaxy Generation', () => {
 
     expect(galaxy.bulge.radiusFraction).toBeGreaterThan(0);
     expect(galaxy.bulge.radiusFraction).toBeLessThan(1);
-    expect(galaxy.bulge.verticalScale).toBeGreaterThan(1);
+    // Bulge must be physically oblate (q = c/a <= 1.0), preventing vertical column elongation
+    expect(galaxy.bulge.verticalScale).toBeGreaterThan(0);
+    expect(galaxy.bulge.verticalScale).toBeLessThanOrEqual(1.0);
     expect(galaxy.bulge.densityMultiplier).toBeGreaterThan(1);
   });
 

@@ -13,7 +13,12 @@
 import { SimulationClock, type TimeMultiplier } from './SimulationClock';
 import { Vector3 } from '../physics/Vector3';
 import { computeGravitationalForce } from '../physics/gravity';
-import { orbitalToCartesian, type OrbitalElements } from '../physics/orbitalElements';
+import {
+  orbitalToCartesian,
+  propagateKeplerOrbit,
+  cartesianToOrbital,
+  type OrbitalElements,
+} from '../physics/orbitalElements';
 import { CelestialBodyType, type CelestialBody } from '../universe/CelestialBody';
 import { G, SOLAR_MASS, secondsToYears } from '../astronomy/constants';
 import { computeStellarEvolution } from '../astronomy/stellarEvolution';
@@ -38,9 +43,26 @@ export const SimulationState = {
 } as const;
 export type SimulationState = typeof SimulationState[keyof typeof SimulationState];
 
+/**
+ * Authoritative orbital propagation mode (Mission P0-3).
+ *
+ * - ANALYTICAL_KEPLER: Bound bodies propagate along exact two-body Keplerian rails.
+ *   Guarantees zero numerical orbital decay or precession over cosmic timescales.
+ *   Skips redundant O(N²) mutual force calculation each frame.
+ *
+ * - NUMERICAL_N_BODY: All bodies are integrated numerically using a 4-step Velocity-Verlet
+ *   algorithm where mutual gravitational forces directly advance velocities and positions.
+ */
+export const PropagationMode = {
+  ANALYTICAL_KEPLER: 'ANALYTICAL_KEPLER',
+  NUMERICAL_N_BODY: 'NUMERICAL_N_BODY',
+} as const;
+export type PropagationMode = typeof PropagationMode[keyof typeof PropagationMode];
+
 export class SimulationEngine {
   readonly clock: SimulationClock;
   private _state: SimulationState = SimulationState.UNINITIALIZED;
+  private _propagationMode: PropagationMode = PropagationMode.ANALYTICAL_KEPLER;
   private _bodies: CelestialBody[] = [];
 
   constructor() {
@@ -50,6 +72,22 @@ export class SimulationEngine {
   /** Current engine state */
   get state(): SimulationState {
     return this._state;
+  }
+
+  /** Current propagation mode */
+  get propagationMode(): PropagationMode {
+    return this._propagationMode;
+  }
+
+  /**
+   * Set the active propagation mode.
+   * Switching to NUMERICAL_N_BODY immediately recomputes accelerations.
+   */
+  setPropagationMode(mode: PropagationMode): void {
+    this._propagationMode = mode;
+    if (mode === PropagationMode.NUMERICAL_N_BODY) {
+      this.computeAccelerations();
+    }
   }
 
   /** Current bodies being simulated */
@@ -126,15 +164,169 @@ export class SimulationEngine {
     if (this._state !== SimulationState.RUNNING) return;
 
     const substeps = this.clock.tick(wallDeltaMs);
+    if (substeps.length === 0) return;
 
-    let totalDt = 0;
-    for (const dt of substeps) {
-      this.integrateStep(dt);
-      totalDt += dt;
+    const totalDt = substeps.reduce((sum, dt) => sum + dt, 0);
+    if (totalDt <= 0) return;
+
+    // 1. Analytically propagate or numerically integrate according to active mode
+    if (this._propagationMode === PropagationMode.ANALYTICAL_KEPLER) {
+      // Analytically propagate all bound Keplerian bodies (planets, moons)
+      this.propagateKeplerianBodies(totalDt);
+
+      // Numerically integrate any non-Keplerian bodies (N-body extension point)
+      const nonKeplerian = this._bodies.filter(
+        (b) => !this.isKeplerianBody(b) && b.type !== CelestialBodyType.STAR
+      );
+      if (nonKeplerian.length > 0) {
+        for (const dt of substeps) {
+          this.integrateNonKeplerianBodies(nonKeplerian, dt);
+        }
+      }
+      // Note: In analytical mode, O(N²) mutual gravity calculation is skipped during
+      // normal update ticks, preserving performance and exact closed Keplerian conics.
+    } else {
+      // NUMERICAL_N_BODY mode:
+      // Multi-body Velocity-Verlet integration driven directly by computed gravitational forces
+      for (const dt of substeps) {
+        this.integrateStep(dt);
+      }
+
+      // Synchronize osculating Keplerian orbital elements for telemetry, orbital paths & UI
+      this.syncOsculatingElements();
     }
 
-    if (totalDt > 0) {
-      this.advanceStellarAge(secondsToYears(totalDt));
+    // Advance stellar evolution
+    this.advanceStellarAge(secondsToYears(totalDt));
+  }
+
+  /**
+   * Determine whether a body is configured for two-body Keplerian propagation.
+   */
+  private isKeplerianBody(body: CelestialBody): boolean {
+    const parentId = body.parentId ?? body.planetProperties?.parentId ?? body.moonProperties?.parentId;
+    if (!parentId) return false;
+
+    const elements = body.planetProperties?.orbitalElements ?? body.moonProperties?.orbitalElements;
+    return !!elements && elements.semiMajorAxis > 0 && elements.eccentricity >= 0 && elements.eccentricity < 1;
+  }
+
+  /**
+   * Propagate all Keplerian bodies forward by dt seconds.
+   *
+   * Traverses hierarchical tiers (parents before children) so that moon positions
+   * are computed relative to the planet's newest position at the current simulation step.
+   *
+   * Two-body approximation:
+   *   μ = G * (M_parent + M_body)
+   */
+  private propagateKeplerianBodies(dt: number): void {
+    if (dt === 0) return;
+
+    const bodies = this._bodies;
+    const bodyMap = new Map<string, CelestialBody>();
+    for (const b of bodies) {
+      bodyMap.set(b.id, b);
+    }
+
+    // Topological sort by parent dependency to ensure parents update before children
+    const visited = new Set<string>();
+    const ordered: CelestialBody[] = [];
+
+    const visit = (body: CelestialBody) => {
+      if (visited.has(body.id)) return;
+      const parentId = body.parentId ?? body.planetProperties?.parentId ?? body.moonProperties?.parentId;
+      if (parentId && bodyMap.has(parentId)) {
+        visit(bodyMap.get(parentId)!);
+      }
+      visited.add(body.id);
+      ordered.push(body);
+    };
+
+    for (const b of bodies) {
+      visit(b);
+    }
+
+    // Propagate in hierarchical order
+    for (const body of ordered) {
+      if (!this.isKeplerianBody(body)) continue;
+
+      const parentId = body.parentId ?? body.planetProperties?.parentId ?? body.moonProperties?.parentId;
+      if (!parentId) continue;
+      const parent = bodyMap.get(parentId);
+      if (!parent) continue;
+
+      const elements = body.planetProperties?.orbitalElements ?? body.moonProperties?.orbitalElements;
+      if (!elements) continue;
+
+      // Two-body gravitational parameter: μ = G * (M_parent + M_body)
+      const mu = G * (parent.mass + body.mass);
+
+      // Advance Keplerian elements
+      const newElements = propagateKeplerOrbit(elements, mu, dt);
+
+      // Update properties
+      if (body.planetProperties) {
+        body.planetProperties.orbitalElements = newElements;
+        body.planetProperties.orbitalRadius = newElements.semiMajorAxis;
+      } else if (body.moonProperties) {
+        body.moonProperties.orbitalElements = newElements;
+        body.moonProperties.orbitalRadius = newElements.semiMajorAxis;
+      }
+
+      // Compute Cartesian coordinates relative to parent in simulation frame (Y-up, XZ plane)
+      const { position: relPos, velocity: relVel } = orbitalToCartesian(newElements, mu);
+
+      // Parent was updated earlier in the topological order, so parent.position is current
+      body.position = parent.position.add(relPos);
+      body.velocity = parent.velocity.add(relVel);
+    }
+  }
+
+  /**
+   * Integrate non-Keplerian bodies numerically (e.g., untracked debris or N-body tests)
+   * using a mathematically consistent 4-step Velocity-Verlet algorithm (Mission P0-2).
+   */
+  private integrateNonKeplerianBodies(nonKeplerian: CelestialBody[], dt: number): void {
+    if (dt <= 0 || !Number.isFinite(dt)) return;
+
+    // Step 1: Update positions using initial velocity and acceleration
+    // r(t + dt) = r(t) + v(t)*dt + 0.5*a(t)*dt^2
+    for (const body of nonKeplerian) {
+      body.position = body.position
+        .add(body.velocity.scale(dt))
+        .add(body.acceleration.scale(0.5 * dt * dt));
+    }
+
+    // Step 2: Compute new accelerations at updated positions from all simulation bodies
+    const newAccelerations: Vector3[] = [];
+    for (const body of nonKeplerian) {
+      let accel = Vector3.zero();
+      for (const other of this._bodies) {
+        if (other.id === body.id) continue;
+        if (other.mass <= 0 || !Number.isFinite(other.mass)) continue;
+        const accelFromOther = computeGravitationalForce(
+          body.position,
+          1.0,
+          other.position,
+          other.mass,
+          G
+        );
+        accel = accel.add(accelFromOther);
+      }
+      newAccelerations.push(accel);
+    }
+
+    // Step 3: Update velocities using average of old and new accelerations:
+    // v(t + dt) = v(t) + 0.5 * (a(t) + a(t + dt)) * dt
+    // Step 4: Advance acceleration state a(t) <- a(t + dt)
+    for (let i = 0; i < nonKeplerian.length; i++) {
+      const body = nonKeplerian[i];
+      const newAcc = newAccelerations[i];
+      body.velocity = body.velocity.add(
+        body.acceleration.add(newAcc).scale(0.5 * dt)
+      );
+      body.acceleration = newAcc;
     }
   }
 
@@ -218,18 +410,18 @@ export class SimulationEngine {
   }
 
   /**
-   * Perform one integration step of duration dt.
+   * Perform one N-body numerical integration step of duration dt across all bodies using Velocity Verlet.
+   * Directly updates positions and velocities according to computed mutual gravitational forces (Mission P0-2, P0-3).
    */
-  private integrateStep(dt: number): void {
+  integrateStep(dt: number): void {
+    if (dt <= 0 || !Number.isFinite(dt)) return;
+
     const bodies = this._bodies;
     const n = bodies.length;
-
-    // Compute new accelerations after hypothetical position update
-    // Using Velocity Verlet: first update positions, then compute new accelerations,
-    // then update velocities
-    const newAccelerations: Vector3[] = new Array(n);
+    if (n === 0) return;
 
     // Step 1: Update positions using current velocity and acceleration
+    // r(t + dt) = r(t) + v(t)*dt + 0.5*a(t)*dt^2
     for (let i = 0; i < n; i++) {
       const body = bodies[i];
       body.position = body.position
@@ -237,12 +429,15 @@ export class SimulationEngine {
         .add(body.acceleration.scale(0.5 * dt * dt));
     }
 
-    // Step 2: Compute new accelerations at new positions
+    // Step 2: Compute new accelerations at new positions: a(t + dt)
+    const newAccelerations: Vector3[] = new Array(n);
     for (let i = 0; i < n; i++) {
       newAccelerations[i] = this.computeAccelerationForBody(i);
     }
 
-    // Step 3: Update velocities using average of old and new accelerations
+    // Step 3: Update velocities using average of old and new accelerations:
+    // v(t + dt) = v(t) + 0.5 * (a(t) + a(t + dt)) * dt
+    // Step 4: Advance acceleration state a(t) <- a(t + dt)
     for (let i = 0; i < n; i++) {
       const body = bodies[i];
       body.velocity = body.velocity.add(
@@ -254,6 +449,8 @@ export class SimulationEngine {
 
   /**
    * Compute the gravitational acceleration for a single body.
+   * Passes mass1 = 1.0 to directly evaluate gravitational acceleration field,
+   * avoiding division-by-zero or numerical instability for light or zero-mass bodies.
    */
   private computeAccelerationForBody(targetIndex: number): Vector3 {
     const bodies = this._bodies;
@@ -264,16 +461,17 @@ export class SimulationEngine {
       if (i === targetIndex) continue;
 
       const other = bodies[i];
-      const force = computeGravitationalForce(
+      if (other.mass <= 0 || !Number.isFinite(other.mass)) continue;
+
+      const accelFromOther = computeGravitationalForce(
         target.position,
-        target.mass,
+        1.0,
         other.position,
         other.mass,
         G
       );
 
-      // a = F / m
-      accel = accel.add(force.scale(1 / target.mass));
+      accel = accel.add(accelFromOther);
     }
 
     return accel;
@@ -285,6 +483,39 @@ export class SimulationEngine {
   computeAccelerations(): void {
     for (let i = 0; i < this._bodies.length; i++) {
       this._bodies[i].acceleration = this.computeAccelerationForBody(i);
+    }
+  }
+
+  /**
+   * Synchronize osculating Keplerian orbital elements from the current Cartesian state
+   * vector for all planets and moons relative to their parent bodies (Mission P0-3).
+   */
+  syncOsculatingElements(): void {
+    const bodyMap = new Map<string, CelestialBody>();
+    for (const b of this._bodies) {
+      bodyMap.set(b.id, b);
+    }
+
+    for (const body of this._bodies) {
+      const parentId = body.parentId ?? body.planetProperties?.parentId ?? body.moonProperties?.parentId;
+      if (!parentId) continue;
+      const parent = bodyMap.get(parentId);
+      if (!parent) continue;
+
+      const relPos = body.position.subtract(parent.position);
+      const relVel = body.velocity.subtract(parent.velocity);
+      const mu = G * (parent.mass + body.mass);
+
+      const elements = cartesianToOrbital(relPos, relVel, mu);
+      if (elements) {
+        if (body.planetProperties) {
+          body.planetProperties.orbitalElements = elements;
+          body.planetProperties.orbitalRadius = elements.semiMajorAxis;
+        } else if (body.moonProperties) {
+          body.moonProperties.orbitalElements = elements;
+          body.moonProperties.orbitalRadius = elements.semiMajorAxis;
+        }
+      }
     }
   }
 

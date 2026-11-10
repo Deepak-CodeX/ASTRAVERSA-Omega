@@ -78,10 +78,14 @@ export class SimulationClock {
 
   /**
    * Set the time multiplier.
-   * @param multiplier - Must be one of the valid TIME_MULTIPLIERS values
+   * @param multiplier - Target time multiplier (0 or negative pauses the clock)
    */
-  setMultiplier(multiplier: TimeMultiplier): void {
-    this._multiplier = multiplier;
+  setMultiplier(multiplier: TimeMultiplier | number): void {
+    if (multiplier <= 0 || !Number.isFinite(multiplier)) {
+      this._multiplier = 0;
+    } else {
+      this._multiplier = multiplier as TimeMultiplier;
+    }
   }
 
   /**
@@ -94,11 +98,11 @@ export class SimulationClock {
   /**
    * Resume the simulation at the given multiplier (default 1×).
    */
-  resume(multiplier: TimeMultiplier = 1): void {
-    if (multiplier === 0) {
+  resume(multiplier: TimeMultiplier | number = 1): void {
+    if (multiplier <= 0 || !Number.isFinite(multiplier)) {
       multiplier = 1;
     }
-    this._multiplier = multiplier;
+    this._multiplier = multiplier as TimeMultiplier;
   }
 
   /**
@@ -112,7 +116,7 @@ export class SimulationClock {
    * @returns Array of simulation timestep durations (seconds) for physics integration
    */
   tick(wallDeltaMs: number): number[] {
-    if (this._multiplier === 0) {
+    if (this._multiplier === 0 || wallDeltaMs <= 0 || !Number.isFinite(wallDeltaMs)) {
       return [];
     }
 

@@ -15,6 +15,7 @@
  */
 
 import type { SpectralClass } from '../astronomy/stellar';
+import type { ProvenanceRecord } from './AstronomicalProvenance';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Galaxy Types
@@ -243,6 +244,9 @@ export interface GalaxyStar {
 
   /** Index of the cluster this star belongs to (-1 = inter-arm / field star) */
   clusterIndex: number;
+
+  /** Provenance metadata establishing observational vs procedural status */
+  provenance?: ProvenanceRecord;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -341,6 +345,9 @@ export interface Galaxy {
 
   /** Representative stars (lightweight, for rendering) */
   stars: GalaxyStar[];
+
+  /** Provenance metadata establishing observational vs procedural status */
+  provenance?: ProvenanceRecord;
 
   /** Quality level used during generation */
   quality: QualityLevel;

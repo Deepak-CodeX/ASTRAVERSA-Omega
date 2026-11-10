@@ -3,6 +3,13 @@
  */
 
 export { SeededRandom } from './SeededRandom';
+export {
+  AstronomicalProvenance,
+  createObservedProvenance,
+  createDerivedProvenance,
+  createProceduralProvenance,
+} from './AstronomicalProvenance';
+export type { ProvenanceRecord } from './AstronomicalProvenance';
 export { CelestialBodyType, createCelestialBody } from './CelestialBody';
 export type { CelestialBody, StarProperties, PlanetProperties, MoonProperties } from './CelestialBody';
 export { generateSolarSystem } from './SolarSystemGenerator';
@@ -25,3 +32,5 @@ export type {
 } from './Galaxy';
 export { generateGalaxy, recalculateSupermassiveBlackHole } from './GalaxyGenerator';
 export type { GalaxyGenerationConfig } from './GalaxyGenerator';
+export { generateMilkyWay, createSagittariusAStar, MILKY_WAY_SEED } from './MilkyWayGenerator';
+export { createCanonicalSolarSystem } from './data/canonicalSolarSystem';

@@ -32,6 +32,7 @@ import {
   SECONDS_PER_DAY,
   SECONDS_PER_YEAR,
 } from '../astronomy/constants';
+import type { ProvenanceRecord } from '../universe/AstronomicalProvenance';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Shared UI Primitives
@@ -80,6 +81,73 @@ function formatNumber(value: number, decimals: number = 2): string {
   if (Math.abs(value) >= 1e3) return `${(value / 1e3).toFixed(decimals)}K`;
   if (Math.abs(value) < 0.01 && value !== 0) return value.toExponential(decimals);
   return value.toFixed(decimals);
+}
+
+export function ProvenanceBadge({ provenance }: { provenance?: ProvenanceRecord }) {
+  if (!provenance) return null;
+  const isObserved = provenance.classification === 'OBSERVED';
+  const isDerived = provenance.classification === 'DERIVED_FROM_OBSERVATIONS';
+  const isHypothetical = provenance.classification === 'HYPOTHETICAL';
+
+  const badgeColor = isObserved
+    ? '#10b981' // emerald green
+    : isDerived
+    ? '#06b6d4' // cyan
+    : isHypothetical
+    ? '#ec4899' // pink
+    : '#f59e0b'; // amber for procedural simulation
+
+  const label = isObserved
+    ? 'OBSERVED (DATA-BACKED)'
+    : isDerived
+    ? 'DERIVED OBSERVATIONAL MODEL'
+    : isHypothetical
+    ? 'HYPOTHETICAL'
+    : 'PROCEDURAL SIMULATION';
+
+  return (
+    <div
+      style={{
+        margin: '6px 0 10px 0',
+        padding: '6px 10px',
+        backgroundColor: `${badgeColor}12`,
+        border: `1px solid ${badgeColor}35`,
+        borderRadius: 4,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 3,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+        <span
+          style={{
+            fontSize: 9,
+            fontFamily: "'JetBrains Mono', monospace",
+            fontWeight: 700,
+            color: badgeColor,
+            letterSpacing: '0.08em',
+          }}
+        >
+          ● {label}
+        </span>
+        {provenance.sourceArchive && (
+          <span style={{ fontSize: 8.5, fontFamily: "'JetBrains Mono', monospace", color: '#94a3b8' }}>
+            {provenance.sourceArchive}
+          </span>
+        )}
+      </div>
+      {provenance.citation && (
+        <span style={{ fontSize: 8.5, color: '#94a3b8', fontStyle: 'italic' }}>
+          {provenance.citation}
+        </span>
+      )}
+      {provenance.notes && (
+        <span style={{ fontSize: 9, color: '#cbd5e1', lineHeight: '1.3' }}>
+          {provenance.notes}
+        </span>
+      )}
+    </div>
+  );
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1048,6 +1116,8 @@ function GalaxyInfo({
         </button>
       </div>
 
+      <ProvenanceBadge provenance={galaxy.provenance} />
+
       <Divider />
 
       {/* Astronomy Facts Pill Header */}
@@ -1146,6 +1216,7 @@ function GalaxyStarInfo({ star, onEnterSystem }: GalaxyStarInfoProps) {
         <span style={styles.name}>{star.name}</span>
       </div>
       <div style={styles.typeLabel}>{star.spectralClass}-TYPE STAR</div>
+      <ProvenanceBadge provenance={star.provenance} />
       <Divider />
       <InfoRow label="MASS" value={`${star.massSolar.toFixed(3)} M☉`} />
       <InfoRow label="RADIUS" value={`${star.radiusSolar.toFixed(3)} R☉`} />
@@ -1185,6 +1256,7 @@ function SystemStarInfo({
 
   return (
     <>
+      <ProvenanceBadge provenance={body.provenance} />
       {evo ? (
         <>
           <InfoRow label="EVOLUTIONARY PHASE" value={evo.phaseLabel} />
@@ -1301,6 +1373,7 @@ function SystemPlanetInfo({ body }: { body: CelestialBody }) {
 
   return (
     <>
+      <ProvenanceBadge provenance={body.provenance} />
       <InfoRow label="TYPE" value={pp?.planetType ?? 'Unknown'} />
       <InfoRow label="MASS" value={`${(body.mass / EARTH_MASS).toFixed(2)} M⊕`} />
       <InfoRow label="RADIUS" value={`${(body.radius / EARTH_RADIUS).toFixed(2)} R⊕`} />
@@ -1463,6 +1536,7 @@ function SystemMoonInfo({ body }: { body: CelestialBody }) {
 
   return (
     <>
+      <ProvenanceBadge provenance={body.provenance} />
       <InfoRow label="TYPE" value="Natural Satellite (Moon)" />
       <InfoRow label="MASS" value={`${(body.mass / EARTH_MASS).toFixed(4)} M⊕`} />
       <InfoRow label="RADIUS" value={`${(body.radius / 1000).toFixed(0)} km`} />
@@ -1536,6 +1610,8 @@ function NucleusInfo({ galaxy, onSelectPreset, onUpdateMass, onClose }: NucleusI
         })}
       </div>
 
+      <ProvenanceBadge provenance={galaxy.provenance} />
+
       <Divider />
       <SectionHeading title="PHYSICAL PROPERTIES" />
       <InfoRow label="MASS" value={`${formatNumber(nucleus.massSolar)} M☉ (${(nucleus.massKg / 1e30).toExponential(2)} kg)`} />
@@ -1574,6 +1650,8 @@ function NucleusInfo({ galaxy, onSelectPreset, onUpdateMass, onClose }: NucleusI
           • Fictional simulation parameters inspired by IC 1101 &amp; Milky Way architecture.
         </div>
       </div>
+
+      <ProvenanceBadge provenance={galaxy.provenance} />
 
       <Divider />
       <button

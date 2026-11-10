@@ -54,6 +54,9 @@ export interface OrbitalElements {
 
   /** True anomaly ν (radians, 0 to 2π). Current angular position in orbit. */
   trueAnomaly: number;
+
+  /** Mean anomaly M (radians, 0 to 2π). Derived from true anomaly. */
+  meanAnomaly?: number;
 }
 
 /**
@@ -243,6 +246,58 @@ export function trueToMeanAnomaly(nu: number, e: number): number {
 export function computeOrbitalPeriod(semiMajorAxis: number, mu: number): number {
   if (semiMajorAxis <= 0) return Infinity; // Hyperbolic or degenerate
   return 2 * Math.PI * Math.sqrt(Math.pow(semiMajorAxis, 3) / mu);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Analytical Keplerian Propagation
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/**
+ * Propagate Keplerian orbital elements forward by dt seconds using two-body Keplerian mechanics.
+ *
+ * Solves Kepler's equation M(t) = E - e·sin(E) where:
+ *   n = √(μ / a³)      (mean motion in rad/s)
+ *   M(t + dt) = M(t) + n · dt
+ *
+ * Grounded in two-body astrodynamics:
+ * - μ = G(M_parent + M_body)
+ * - Guarantees exact, closed orbits without numerical drift
+ * - Valid for bound elliptical orbits (0 ≤ e < 1, a > 0)
+ *
+ * @param elements - Current orbital elements
+ * @param mu - Gravitational parameter μ = G·(M_parent + M_body) in m³/s²
+ * @param dtSeconds - Elapsed simulation time in seconds (can be positive, zero, or negative)
+ * @returns Updated orbital elements with new trueAnomaly and meanAnomaly
+ */
+export function propagateKeplerOrbit(
+  elements: OrbitalElements,
+  mu: number,
+  dtSeconds: number
+): OrbitalElements {
+  const { semiMajorAxis: a, eccentricity: e, trueAnomaly: nu } = elements;
+
+  // Guard against non-elliptical or degenerate orbits
+  if (a <= 0 || e < 0 || e >= 1 || mu <= 0 || dtSeconds === 0) {
+    return elements;
+  }
+
+  // Mean motion: n = √(μ / a³)
+  const n = Math.sqrt(mu / Math.pow(a, 3));
+
+  // Current mean anomaly derived from current true anomaly
+  const currentM = trueToMeanAnomaly(nu, e);
+
+  // New mean anomaly advanced by n · dt
+  const newM = normalizeAngle(currentM + n * dtSeconds);
+
+  // Solve Kepler equation for eccentric anomaly E, then convert to true anomaly ν
+  const newNu = meanToTrueAnomaly(newM, e);
+
+  return {
+    ...elements,
+    trueAnomaly: newNu,
+    meanAnomaly: newM,
+  };
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

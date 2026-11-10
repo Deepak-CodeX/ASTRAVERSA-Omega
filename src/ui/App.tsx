@@ -31,7 +31,7 @@ import { SystemEditor } from './SystemEditor';
 import { SimulationEngine } from '../engine/SimulationEngine';
 import { Universe } from '../universe/Universe';
 import { ViewLevel } from '../universe/Galaxy';
-import type { GalaxyStar, StarCluster } from '../universe/Galaxy';
+import type { GalaxyStar, StarCluster, QualityLevel } from '../universe/Galaxy';
 import { type CelestialBody, CelestialBodyType } from '../universe/CelestialBody';
 import type { TimeMultiplier } from '../engine/SimulationClock';
 import type { OrbitalElements } from '../physics/orbitalElements';
@@ -46,7 +46,7 @@ export function App() {
 
   if (!universeRef.current) {
     universeRef.current = new Universe(DEFAULT_SEED);
-    universeRef.current.generateGalaxy({ quality: 'MEDIUM' as const });
+    universeRef.current.loadMilkyWay('MEDIUM');
   }
   if (!engineRef.current) {
     engineRef.current = new SimulationEngine();
@@ -57,6 +57,9 @@ export function App() {
   const galaxy = universe.galaxy;
 
   // ── UI State ────────────────────────────────────
+  const [galaxyMode, setGalaxyMode] = useState<'MILKY_WAY' | 'ANANTARA'>('MILKY_WAY');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchFeedback, setSearchFeedback] = useState<string | null>(null);
   const [viewLevel, setViewLevel] = useState<string>(ViewLevel.GALAXY);
   const [selectedStarIndex, setSelectedStarIndex] = useState<number | null>(null);
   const [selectedNucleus, setSelectedNucleus] = useState<boolean>(false);
@@ -71,7 +74,7 @@ export function App() {
   const [observatorySettings, setObservatorySettings] = useState<GalaxyObservatorySettings>(() =>
     createDefaultObservatorySettings()
   );
-  const [currentPhysicalDiameterLy, setCurrentPhysicalDiameterLy] = useState<number>(500000);
+  const [currentPhysicalDiameterLy, setCurrentPhysicalDiameterLy] = useState<number>(100000);
   const [isRegenerating, setIsRegenerating] = useState<boolean>(false);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFirstMountRef = useRef<boolean>(true);
@@ -105,16 +108,16 @@ export function App() {
     return null;
   }, [galaxy, selectedStar]);
 
-  // Current selected body in system view
+  // Current selected body in system view (authoritative engine state)
   const selectedBody: CelestialBody | null = useMemo(() => {
     if (inSystemView) {
       if (selectedBodyId) {
-        return universe.findBody(selectedBodyId) ?? universe.bodies[0] ?? null;
+        return engine.getBody(selectedBodyId) ?? engine.bodies[0] ?? null;
       }
-      return universe.bodies[0] ?? null;
+      return engine.bodies[0] ?? null;
     }
     return null;
-  }, [inSystemView, selectedBodyId, universe, tick]);
+  }, [inSystemView, selectedBodyId, engine, tick]);
 
   // ── Galaxy View Handlers ────────────────────────
 
@@ -180,6 +183,9 @@ export function App() {
     clusterCount,
   } = observatorySettings;
 
+  const currentQuality: QualityLevel =
+    starCount <= 12000 ? 'LOW' : starCount <= 30000 ? 'MEDIUM' : 'HIGH';
+
   useEffect(() => {
     if (isFirstMountRef.current) {
       isFirstMountRef.current = false;
@@ -207,18 +213,24 @@ export function App() {
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      universe.generateGalaxy({
-        targetDiameterLy,
-        starCount,
-        armCount,
-        armPitchAngleDeg,
-        armWidthMult,
-        armWindingFactor,
-        bulgeRadiusFraction,
-        haloRadiusMultiplier,
-        clusterCount,
-        quality: 'MEDIUM',
-      });
+      if (galaxyMode === 'MILKY_WAY') {
+        universe.loadMilkyWay(currentQuality, starCount);
+        setCurrentPhysicalDiameterLy(100000);
+      } else {
+        universe.generateGalaxy({
+          targetDiameterLy,
+          starCount,
+          armCount,
+          armPitchAngleDeg,
+          armWidthMult,
+          armWindingFactor,
+          bulgeRadiusFraction,
+          haloRadiusMultiplier,
+          clusterCount,
+          quality: 'MEDIUM',
+        });
+        setCurrentPhysicalDiameterLy(targetDiameterLy);
+      }
       lastGeneratedConfigRef.current = {
         targetDiameterLy,
         starCount,
@@ -230,7 +242,6 @@ export function App() {
         haloRadiusMultiplier,
         clusterCount,
       };
-      setCurrentPhysicalDiameterLy(targetDiameterLy);
       setSelectedStarIndex(null);
       setIsRegenerating(false);
       setTick(t => t + 1);
@@ -303,10 +314,11 @@ export function App() {
 
   // ── System View Handlers ────────────────────────
 
-  const handleEnterSystem = useCallback(() => {
-    if (selectedStarIndex === null) return;
+  const handleEnterSystem = useCallback((targetIndex?: number) => {
+    const idx = targetIndex ?? selectedStarIndex ?? 0;
+    setSelectedStarIndex(idx);
 
-    const system = universe.enterStarSystem(selectedStarIndex);
+    const system = universe.enterStarSystem(idx);
     if (system) {
       engine.initialize(system.bodies);
       engine.start(10_000);
@@ -325,6 +337,114 @@ export function App() {
     setTick(t => t + 1);
   }, [universe, engine]);
 
+  const handleSwitchGalaxy = useCallback((mode: 'MILKY_WAY' | 'ANANTARA') => {
+    if (viewLevel !== ViewLevel.GALAXY) {
+      universe.exitStarSystem();
+      engine.pause();
+      setViewLevel(ViewLevel.GALAXY);
+      setSelectedBodyId(null);
+      setIsEditorOpen(false);
+    }
+    if (mode === 'MILKY_WAY') {
+      universe.loadMilkyWay(currentQuality);
+      setGalaxyMode('MILKY_WAY');
+      setCurrentPhysicalDiameterLy(100000);
+      setSearchFeedback('Loaded real Milky Way (Akashaganga) · 100,000 ly');
+    } else {
+      universe.loadAnantara({
+        targetDiameterLy: 500000,
+        quality: currentQuality,
+      });
+      setGalaxyMode('ANANTARA');
+      setCurrentPhysicalDiameterLy(500000);
+      setSearchFeedback('Loaded procedural ANANTARA α (seed 42) · 500,000 ly');
+    }
+    setSelectedStarIndex(null);
+    setSelectedNucleus(false);
+    setTick(t => t + 1);
+  }, [viewLevel, universe, engine, currentQuality]);
+
+  const handleGoToOurSolarSystem = useCallback(() => {
+    if (galaxyMode !== 'MILKY_WAY') {
+      universe.loadMilkyWay(currentQuality);
+      setGalaxyMode('MILKY_WAY');
+      setCurrentPhysicalDiameterLy(100000);
+    }
+    const sunIdx = universe.getSunStarIndex();
+    if (sunIdx >= 0) {
+      handleEnterSystem(sunIdx);
+      setSelectedBodyId('earth');
+      setSearchFeedback('Entered canonical Solar System (NASA/JPL Horizons)');
+    }
+    setTick(t => t + 1);
+  }, [galaxyMode, universe, currentQuality, handleEnterSystem]);
+
+  const handleSearch = useCallback((query: string) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return;
+
+    // 1. Search for Sol / Sun / Earth / Solar System
+    if (q.includes('sun') || q.includes('sol') || q.includes('earth') || q.includes('solar')) {
+      if (galaxyMode !== 'MILKY_WAY') {
+        universe.loadMilkyWay(currentQuality);
+        setGalaxyMode('MILKY_WAY');
+        setCurrentPhysicalDiameterLy(100000);
+      }
+      const sunIdx = universe.getSunStarIndex();
+      if (sunIdx >= 0) {
+        setSelectedStarIndex(sunIdx);
+        setSelectedNucleus(false);
+        setSearchFeedback('Located Sun (Sol) on the Orion Spur');
+        if (q.includes('earth') || q.includes('system') || q.includes('solar')) {
+          handleEnterSystem(sunIdx);
+          if (q.includes('earth')) {
+            setSelectedBodyId('earth');
+          }
+        }
+      }
+      setTick(t => t + 1);
+      return;
+    }
+
+    // 2. Search for Sagittarius A* / Nucleus
+    if (q.includes('sagittarius') || q.includes('sgr') || q.includes('nucleus') || q.includes('black hole') || q.includes('anantara a')) {
+      setSelectedNucleus(true);
+      setSelectedStarIndex(null);
+      setActivePreset('nucleus');
+      setSearchFeedback(`Targeted Galactic Nucleus: ${universe.nucleus?.name ?? 'SMBH'}`);
+      setTick(t => t + 1);
+      return;
+    }
+
+    // 3. Search for Milky Way
+    if (q.includes('milky') || q.includes('akashaganga')) {
+      handleSwitchGalaxy('MILKY_WAY');
+      return;
+    }
+
+    // 4. Search for ANANTARA
+    if (q.includes('anantara')) {
+      handleSwitchGalaxy('ANANTARA');
+      return;
+    }
+
+    // 5. Search in active galaxy stars
+    if (universe.galaxy) {
+      const starIdx = universe.galaxy.stars.findIndex(
+        s => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q)
+      );
+      if (starIdx >= 0) {
+        setSelectedStarIndex(starIdx);
+        setSelectedNucleus(false);
+        setSearchFeedback(`Located star: ${universe.galaxy.stars[starIdx].name}`);
+        setTick(t => t + 1);
+        return;
+      }
+    }
+
+    setSearchFeedback(`No target matching "${query}" found.`);
+  }, [galaxyMode, universe, currentQuality, handleEnterSystem, handleSwitchGalaxy]);
+
   const handleBodySelect = useCallback((id: string | null) => {
     setSelectedBodyId(id);
   }, []);
@@ -340,12 +460,12 @@ export function App() {
   }, [engine]);
 
   const handleResetStellarAge = useCallback(() => {
-    const star = universe.bodies.find(b => b.type === CelestialBodyType.STAR);
+    const star = engine.bodies.find(b => b.type === CelestialBodyType.STAR);
     if (star) {
       engine.setStarAge(star, 0);
       setTick(t => t + 1);
     }
-  }, [universe, engine]);
+  }, [engine]);
 
   const handleApplyBodyEdits = useCallback((
     bodyId: string,
@@ -356,6 +476,7 @@ export function App() {
     if (orbitalUpdates) {
       engine.updateBodyOrbit(bodyId, orbitalUpdates);
     }
+    // Update universe active system body metadata if present so system transitions stay aligned
     const b = universe.findBody(bodyId);
     if (b) {
       b.name = physicalUpdates.name;
@@ -368,14 +489,6 @@ export function App() {
         } else if (b.moonProperties) {
           b.moonProperties.orbitalElements = orbitalUpdates;
         }
-      }
-    }
-    // Synchronize all body positions and velocities from engine to universe
-    for (const eb of engine.bodies) {
-      const ub = universe.findBody(eb.id);
-      if (ub) {
-        ub.position = eb.position.clone();
-        ub.velocity = eb.velocity.clone();
       }
     }
     setTick(t => t + 1);
@@ -391,7 +504,7 @@ export function App() {
   const handleDeleteBody = useCallback((bodyId: string) => {
     universe.removeBody(bodyId);
     engine.removeBody(bodyId);
-    setSelectedBodyId(universe.bodies[0]?.id ?? null);
+    setSelectedBodyId(engine.bodies[0]?.id ?? null);
     setTick(t => t + 1);
   }, [universe, engine]);
 
@@ -401,22 +514,19 @@ export function App() {
       universe,
       engine,
       enterSystem: (starIndex: number = 0) => {
-        setSelectedStarIndex(starIndex);
-        const system = universe.enterStarSystem(starIndex);
-        if (system) {
-          engine.initialize(system.bodies);
-          engine.start(10_000);
-          setViewLevel(ViewLevel.SYSTEM);
-          setSelectedBodyId(system.bodies[0]?.id ?? null);
-          setTick(t => t + 1);
-        }
+        handleEnterSystem(starIndex);
       },
+      enterSolarSystem: () => {
+        handleGoToOurSolarSystem();
+      },
+      loadMilkyWay: () => handleSwitchGalaxy('MILKY_WAY'),
+      loadAnantara: () => handleSwitchGalaxy('ANANTARA'),
       selectBody: (id: string | null) => {
         setSelectedBodyId(id);
         setTick(t => t + 1);
       },
     };
-  }, [universe, engine]);
+  }, [universe, engine, handleEnterSystem, handleGoToOurSolarSystem, handleSwitchGalaxy]);
 
   // Periodically update time display
   useEffect(() => {
@@ -441,34 +551,118 @@ export function App() {
             ? (
               <>
                 {universe.activeStar?.name ?? 'Star System'}
-                <span style={styles.seedLabel}> · System</span>
+                {universe.isCanonicalSolarSystem ? (
+                  <span style={styles.observedBadge}> · OBSERVED (NASA/JPL)</span>
+                ) : (
+                  <span style={styles.seedLabel}> · Procedural System</span>
+                )}
               </>
             )
             : (
               <>
-                {galaxy?.name ?? 'Galaxy'}
-                <span style={styles.seedLabel}> · Seed {DEFAULT_SEED}</span>
+                {galaxy?.displayName ?? galaxy?.name ?? 'Galaxy'}
+                {galaxyMode === 'MILKY_WAY' ? (
+                  <span style={styles.observedBadge}> · REAL OBSERVED (100k ly)</span>
+                ) : (
+                  <span style={styles.seedLabel}> · Seed {DEFAULT_SEED} (500k ly)</span>
+                )}
               </>
             )
           }
         </p>
+
+        {/* Galaxy Toggle / Mode */}
+        <div style={styles.galaxyToggleRow}>
+          <button
+            style={{
+              ...styles.galaxyToggleBtn,
+              ...(galaxyMode === 'MILKY_WAY' ? styles.galaxyToggleBtnActive : {}),
+            }}
+            onClick={() => handleSwitchGalaxy('MILKY_WAY')}
+          >
+            MILKY WAY (REAL)
+          </button>
+          <button
+            style={{
+              ...styles.galaxyToggleBtn,
+              ...(galaxyMode === 'ANANTARA' ? styles.galaxyToggleBtnActive : {}),
+            }}
+            onClick={() => handleSwitchGalaxy('ANANTARA')}
+          >
+            ANANTARA α (PROCEDURAL)
+          </button>
+        </div>
+
         {/* View indicator */}
         <div style={styles.viewIndicator}>
-          <span style={{
-            ...styles.viewBadge,
-            ...(viewLevel === ViewLevel.GALAXY ? styles.viewBadgeActive : {}),
-          }}>
+          <button
+            style={{
+              ...styles.viewBadge,
+              ...(viewLevel === ViewLevel.GALAXY ? styles.viewBadgeActive : {}),
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+            onClick={() => {
+              if (viewLevel !== ViewLevel.GALAXY) {
+                handleExitSystem();
+              }
+            }}
+          >
             GALAXY
-          </span>
+          </button>
           <span style={styles.viewArrow}>{inSystemView ? '→' : ''}</span>
-          <span style={{
-            ...styles.viewBadge,
-            ...(viewLevel === ViewLevel.SYSTEM ? styles.viewBadgeActive : {}),
-            opacity: inSystemView ? 1 : 0.3,
-          }}>
+          <button
+            style={{
+              ...styles.viewBadge,
+              ...(viewLevel === ViewLevel.SYSTEM ? styles.viewBadgeActive : {}),
+              opacity: inSystemView ? 1 : 0.6,
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+            onClick={() => {
+              if (viewLevel !== ViewLevel.SYSTEM) {
+                handleEnterSystem();
+              }
+            }}
+          >
             SYSTEM
-          </span>
+          </button>
+
+          {/* Quick Action: OUR SOLAR SYSTEM */}
+          <button
+            style={styles.ourSolarSystemButton}
+            onClick={handleGoToOurSolarSystem}
+            title="Jump to Earth & Our Canonical Solar System"
+          >
+            ☀️ OUR SOLAR SYSTEM
+          </button>
         </div>
+
+        {/* Astronomical Search Bar */}
+        <div style={styles.searchRow}>
+          <input
+            type="text"
+            placeholder="Search Sol, Earth, Sgr A*, Milky Way..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSearch(searchQuery);
+            }}
+            style={styles.searchInput}
+          />
+          <button
+            style={styles.searchSubmitBtn}
+            onClick={() => handleSearch(searchQuery)}
+            title="Execute Astronomical Search"
+          >
+            FIND
+          </button>
+        </div>
+        {searchFeedback && (
+          <div style={styles.searchFeedbackText}>{searchFeedback}</div>
+        )}
       </div>
 
       {/* 3D Viewport — Galaxy or System */}
@@ -491,7 +685,7 @@ export function App() {
       {inSystemView && (
         <Scene
           engine={engine}
-          bodies={universe.bodies}
+          bodies={engine.bodies}
           selectedId={selectedBodyId}
           onSelect={handleBodySelect}
         />
@@ -539,7 +733,7 @@ export function App() {
       {inSystemView && isEditorOpen && (
         <SystemEditor
           selectedBody={selectedBody}
-          allBodies={universe.bodies}
+          allBodies={engine.bodies}
           onApplyBodyEdits={handleApplyBodyEdits}
           onAddPlanet={handleAddPlanet}
           onAddMoon={handleAddPlanet}
@@ -620,5 +814,83 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 10,
     color: 'rgba(140, 170, 210, 0.3)',
     fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+  },
+  galaxyToggleRow: {
+    display: 'flex',
+    gap: 6,
+    marginTop: 8,
+  },
+  galaxyToggleBtn: {
+    fontSize: 8.5,
+    letterSpacing: 1.2,
+    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    padding: '3px 8px',
+    borderRadius: 4,
+    background: 'rgba(255, 255, 255, 0.04)',
+    border: '1px solid rgba(255, 255, 255, 0.12)',
+    color: '#94a3b8',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+  },
+  galaxyToggleBtnActive: {
+    background: 'rgba(56, 189, 248, 0.15)',
+    border: '1px solid rgba(56, 189, 248, 0.45)',
+    color: '#38bdf8',
+    fontWeight: 600,
+  },
+  ourSolarSystemButton: {
+    fontSize: 8.5,
+    letterSpacing: 1,
+    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    fontWeight: 600,
+    padding: '3px 9px',
+    borderRadius: 4,
+    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(234, 88, 12, 0.25))',
+    border: '1px solid rgba(245, 158, 11, 0.5)',
+    color: '#fbbf24',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+    marginLeft: 6,
+  },
+  observedBadge: {
+    color: '#10b981',
+    fontWeight: 600,
+  },
+  searchRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  searchInput: {
+    fontSize: 9.5,
+    fontFamily: "'JetBrains Mono', monospace",
+    background: 'rgba(15, 23, 42, 0.75)',
+    border: '1px solid rgba(148, 163, 184, 0.2)',
+    borderRadius: 4,
+    color: '#e2e8f0',
+    padding: '4px 8px',
+    width: 210,
+    outline: 'none',
+  },
+  searchSubmitBtn: {
+    fontSize: 8.5,
+    fontFamily: "'JetBrains Mono', monospace",
+    background: 'rgba(56, 189, 248, 0.15)',
+    border: '1px solid rgba(56, 189, 248, 0.3)',
+    borderRadius: 4,
+    color: '#38bdf8',
+    padding: '4px 8px',
+    cursor: 'pointer',
+  },
+  searchFeedbackText: {
+    marginTop: 4,
+    fontSize: 9,
+    fontFamily: "'JetBrains Mono', monospace",
+    color: '#38bdf8',
+    background: 'rgba(15, 23, 42, 0.85)',
+    padding: '2px 6px',
+    borderRadius: 3,
+    display: 'inline-block',
   },
 };

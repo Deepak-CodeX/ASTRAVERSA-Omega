@@ -4,4 +4,5 @@
 
 export { SimulationClock, TIME_MULTIPLIERS, TIME_MULTIPLIER_LABELS } from './SimulationClock';
 export type { TimeMultiplier } from './SimulationClock';
-export { SimulationEngine, SimulationState } from './SimulationEngine';
+export { SimulationEngine, SimulationState, PropagationMode } from './SimulationEngine';
+export type { PropagationMode as PropagationModeType } from './SimulationEngine';

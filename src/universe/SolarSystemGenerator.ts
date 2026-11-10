@@ -49,6 +49,7 @@ import { AU } from '../astronomy/constants';
 import { Vector3 } from '../physics/Vector3';
 
 import { G } from '../astronomy/constants';
+import { createProceduralProvenance } from './AstronomicalProvenance';
 
 /**
  * Options for solar system generation.
@@ -188,6 +189,7 @@ export function generateSolarSystem(
     velocity: Vector3.zero(),
     color: evolution.color,
     seed,
+    provenance: createProceduralProvenance(seed, 'Synthetic procedural star'),
     starProperties: {
       spectralClass: evolution.spectralClass as SpectralClass,
       luminosity: evolution.luminosityWatts,
@@ -300,6 +302,7 @@ export function generateSolarSystem(
       color,
       seed: planetRng.deriveSeed(0),
       parentId: star.id,
+      provenance: createProceduralProvenance(planetRng.deriveSeed(0), 'Synthetic procedural planet'),
       planetProperties: {
         planetType,
         orbitalRadius: orbitalDistanceM,
@@ -448,6 +451,7 @@ export function generateMoonsForPlanet(
       color: moonColor,
       seed: moonRng.deriveSeed(m),
       parentId: planet.id,
+      provenance: createProceduralProvenance(moonRng.deriveSeed(m), 'Synthetic procedural natural satellite'),
       moonProperties: {
         orbitalRadius: safeDistanceM,
         orbitalPeriod: period,

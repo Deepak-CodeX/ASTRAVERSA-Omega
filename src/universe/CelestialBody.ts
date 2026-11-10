@@ -20,6 +20,7 @@ import type {
   HabitabilityStatus,
 } from '../astronomy/stellarPlanetaryCoupling';
 import type { PlanetaryEnvironment } from '../astronomy/planetaryEnvironment';
+import type { ProvenanceRecord } from './AstronomicalProvenance';
 
 /**
  * Types of celestial bodies.
@@ -127,6 +128,9 @@ export interface CelestialBody {
    */
   parentId?: string;
 
+  /** Provenance record establishing observational vs procedural status */
+  provenance?: ProvenanceRecord;
+
   /** Star-specific properties (only for STAR type) */
   starProperties?: StarProperties;
 
@@ -151,6 +155,7 @@ export function createCelestialBody(params: {
   color: string;
   seed: number;
   parentId?: string;
+  provenance?: ProvenanceRecord;
   starProperties?: StarProperties;
   planetProperties?: PlanetProperties;
   moonProperties?: MoonProperties;
@@ -167,6 +172,7 @@ export function createCelestialBody(params: {
     color: params.color,
     seed: params.seed,
     parentId: params.parentId,
+    provenance: params.provenance,
     starProperties: params.starProperties,
     planetProperties: params.planetProperties,
     moonProperties: params.moonProperties,

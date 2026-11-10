@@ -62,6 +62,7 @@ import type {
   QualityLevel,
 } from './Galaxy';
 import { GalaxyType, QUALITY_STAR_COUNTS } from './Galaxy';
+import { createProceduralProvenance } from './AstronomicalProvenance';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Galaxy Name Generation
@@ -368,11 +369,11 @@ export function generateGalaxy(
     densityMultiplier: 5.0,
   };
 
-  // ── Central Spheroidal Bulge ─────────────────────────────
+  // ── Central Spheroidal Bulge (Oblate Boxy/Peanut morphology) ───────
   const bulgeRadiusFraction = config.bulgeRadiusFraction ?? 0.13; // ~9.96 kpc radius default
   const bulge: BulgeParams = {
     radiusFraction: bulgeRadiusFraction,
-    verticalScale: 2.2, // ~8.8 kpc vertical extent
+    verticalScale: 0.35, // q = c/a ~ 0.35 (strictly oblate, non-elongated)
     densityMultiplier: 4.5,
   };
 
@@ -471,6 +472,12 @@ export function generateGalaxy(
     nucleus,
     clusters,
     stars,
+    provenance: createProceduralProvenance(
+      seed,
+      isCanonicalAnantara
+        ? 'ANANTARA α — Procedural 500,000 ly barred spiral simulation (seed 42)'
+        : 'Procedural barred spiral simulation'
+    ),
     quality: resolvedQuality,
   };
 }
@@ -535,7 +542,7 @@ function generateBarredGalaxyStars(
   rng: SeededRandom,
   totalStars: number,
   galaxyRadius: number,
-  galaxyThickness: number,
+  _galaxyThickness: number,
   bar: BarParams,
   bulge: BulgeParams,
   diskStructure: DiskStructureParams,
@@ -551,14 +558,15 @@ function generateBarredGalaxyStars(
   const armCount = Math.floor(totalStars * 0.54);
   const diskCount = totalStars - bulgeCount - barCount - armCount;
 
-  // 1. Spheroidal Bulge Stars
+  // 1. Spheroidal Bulge Stars (strictly oblate boxy/peanut morphology)
   const bulgeRng = rng.fork(100);
   const bulgeRadius = galaxyRadius * bulge.radiusFraction;
   for (let i = 0; i < bulgeCount; i++) {
     const sRng = bulgeRng.fork(i);
     const x = sRng.gaussian(0, bulgeRadius * 0.38);
     const z = sRng.gaussian(0, bulgeRadius * 0.38);
-    const y = sRng.gaussian(0, galaxyThickness * bulge.verticalScale * 0.28);
+    // Vertical scale is strictly compressed to prevent elongation
+    const y = sRng.gaussian(0, bulgeRadius * bulge.verticalScale * 0.38);
     stars.push(createGalaxyStar(stars.length, galaxySeed, sRng, x, y, z, avgMetallicity * 1.15, -1));
   }
 
@@ -683,6 +691,7 @@ function createGalaxyStar(
     radiusSolar: stellar.radius / 6.957e8,
     metallicity: Math.max(0, Math.min(1, metallicity)),
     clusterIndex,
+    provenance: createProceduralProvenance(starSeed, 'Synthetic procedural tracer star'),
   };
 }
 

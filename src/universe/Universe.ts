@@ -13,10 +13,12 @@
 import type { CelestialBody } from './CelestialBody';
 import type { SolarSystem } from './SolarSystemGenerator';
 import { generateSolarSystem } from './SolarSystemGenerator';
-import type { Galaxy, GalaxyStar, NavigationState, SupermassiveBlackHole } from './Galaxy';
+import type { Galaxy, GalaxyStar, NavigationState, SupermassiveBlackHole, QualityLevel } from './Galaxy';
 import { ViewLevel } from './Galaxy';
 import { generateGalaxy, recalculateSupermassiveBlackHole } from './GalaxyGenerator';
 import type { GalaxyGenerationConfig } from './GalaxyGenerator';
+import { generateMilkyWay } from './MilkyWayGenerator';
+import { createCanonicalSolarSystem } from './data/canonicalSolarSystem';
 
 /**
  * The Universe is the top-level container for all simulation content.
@@ -47,7 +49,7 @@ export class Universe {
   // ── Galaxy ──────────────────────────────────
 
   /**
-   * Generate the galaxy for this universe.
+   * Generate the galaxy for this universe (defaults to ANANTARA α with universe seed).
    */
   generateGalaxy(config?: GalaxyGenerationConfig): Galaxy {
     this._galaxy = generateGalaxy(this.seed, config);
@@ -56,6 +58,40 @@ export class Universe {
       galaxyId: this._galaxy.id,
     };
     return this._galaxy;
+  }
+
+  /**
+   * Load and switch to the observationally constrained real Milky Way model.
+   */
+  loadMilkyWay(quality: QualityLevel = 'MEDIUM', explicitStarCount?: number): Galaxy {
+    this._galaxy = generateMilkyWay(quality, explicitStarCount);
+    this._navigation = {
+      level: ViewLevel.GALAXY,
+      galaxyId: this._galaxy.id,
+    };
+    return this._galaxy;
+  }
+
+  /**
+   * Load and switch to the colossal procedural galaxy ANANTARA α (seed 42).
+   */
+  loadAnantara(config?: GalaxyGenerationConfig): Galaxy {
+    return this.generateGalaxy(config);
+  }
+
+  /**
+   * Check if current active galaxy is the real Milky Way.
+   */
+  get isCanonicalMilkyWay(): boolean {
+    return this._galaxy?.id === 'galaxy-milky-way';
+  }
+
+  /**
+   * Find index of the Sun in the current galaxy, or -1 if not present.
+   */
+  getSunStarIndex(): number {
+    if (!this._galaxy) return -1;
+    return this._galaxy.stars.findIndex(s => s.id === 'star-sun-sol');
   }
 
   /** Get the generated galaxy. */
@@ -79,7 +115,8 @@ export class Universe {
 
   /**
    * Enter a star system from the galaxy view.
-   * Generates a solar system from the star's seed.
+   * If the selected star is our Sun (Sol), loads the Canonical Solar System!
+   * Otherwise, generates a deterministic procedural system from the star's seed.
    */
   enterStarSystem(starIndex: number): SolarSystem | null {
     if (!this._galaxy || starIndex < 0 || starIndex >= this._galaxy.stars.length) {
@@ -87,7 +124,14 @@ export class Universe {
     }
 
     const star = this._galaxy.stars[starIndex];
-    this._solarSystem = generateSolarSystem(star.seed, { includeMoons: true });
+
+    // Check if drilling down into our canonical Sun
+    if (star.id === 'star-sun-sol') {
+      this._solarSystem = createCanonicalSolarSystem();
+    } else {
+      this._solarSystem = generateSolarSystem(star.seed, { includeMoons: true });
+    }
+
     this._activeStarIndex = starIndex;
     this._navigation = {
       level: ViewLevel.SYSTEM,
@@ -99,6 +143,13 @@ export class Universe {
     };
 
     return this._solarSystem;
+  }
+
+  /**
+   * Check if currently active solar system is the ground-truth observed Solar System.
+   */
+  get isCanonicalSolarSystem(): boolean {
+    return this._solarSystem?.star.id === 'sun';
   }
 
   /**

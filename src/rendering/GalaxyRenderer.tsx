@@ -898,13 +898,14 @@ function DiffuseGalacticEmission({
 
     let idx = 0;
 
-    // 1. Bulge core emission (Warm golden amber)
+    // 1. Bulge core emission (Warm golden amber, strictly oblate morphology)
     const showBulge = layers.bulge;
     const bulgeRadius = galaxyRadius * galaxy.bulge.radiusFraction;
+    const bulgeVScale = galaxy.bulge.verticalScale <= 1.0 ? galaxy.bulge.verticalScale : 0.35;
     for (let i = 0; i < bulgeCount; i++) {
       const u = rng.gaussian(0, bulgeRadius * 0.40 * cloudCoverage);
       const v = rng.gaussian(0, bulgeRadius * 0.40 * cloudCoverage);
-      const w = rng.gaussian(0, galaxy.thickness * 0.35 * cloudCoverage);
+      const w = rng.gaussian(0, bulgeRadius * bulgeVScale * 0.38 * cloudCoverage);
 
       positions[idx * 3] = u * RENDER_SCALE_KPC;
       positions[idx * 3 + 1] = w * RENDER_SCALE_KPC;
@@ -914,8 +915,8 @@ function DiffuseGalacticEmission({
         colors[idx * 3] = 1.0;
         colors[idx * 3 + 1] = 0.78 + rng.next() * 0.10;
         colors[idx * 3 + 2] = 0.45 + rng.next() * 0.15;
-        sizes[idx] = rng.range(22.0, 48.0) * Math.sqrt(cloudCoverage);
-        opacities[idx] = rng.range(0.12, 0.24);
+        sizes[idx] = rng.range(14.0, 28.0) * Math.sqrt(cloudCoverage);
+        opacities[idx] = rng.range(0.12, 0.22);
       } else {
         sizes[idx] = 0;
         opacities[idx] = 0;
@@ -1095,15 +1096,29 @@ interface CoreGlowProps {
 }
 
 function GalacticCoreGlow({ galaxy }: CoreGlowProps) {
-  const meshRef = useRef<THREE.Mesh>(null);
-
-  useFrame((state) => {
-    if (meshRef.current) {
-      meshRef.current.lookAt(state.camera.position);
-    }
-  });
+  const billboardRef = useRef<THREE.Mesh>(null);
+  const diskRef = useRef<THREE.Mesh>(null);
+  const { camera } = useThree();
 
   const coreRadius = galaxy.radius * galaxy.bulge.radiusFraction * RENDER_SCALE_KPC;
+  // Oblate bulge flattening ratio q = c/a ~ 0.35 (matching observational astronomy)
+  const qRatio = Math.min(0.45, Math.max(0.25, galaxy.bulge.verticalScale <= 1.0 ? galaxy.bulge.verticalScale : 0.35));
+
+  useFrame(() => {
+    if (billboardRef.current) {
+      // Look at camera in azimuth, but preserve galactic plane flattening along Y
+      const camPos = camera.position;
+      const camDistTotal = Math.sqrt(camPos.x * camPos.x + camPos.y * camPos.y + camPos.z * camPos.z);
+      const sinElev = camDistTotal > 1e-3 ? Math.abs(camPos.y) / camDistTotal : 1.0;
+
+      // Apparent projected axis ratio: when face-on (sinElev = 1), scale Y is 1.0;
+      // when edge-on (sinElev = 0), scale Y is qRatio (~0.35).
+      const projectedVerticalScale = Math.sqrt(sinElev * sinElev + qRatio * qRatio * (1 - sinElev * sinElev));
+
+      billboardRef.current.lookAt(camPos);
+      billboardRef.current.scale.set(1.0, projectedVerticalScale, 1.0);
+    }
+  });
 
   const coreGlowMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
@@ -1111,7 +1126,22 @@ function GalacticCoreGlow({ galaxy }: CoreGlowProps) {
       fragmentShader: CORE_GLOW_FRAGMENT_SHADER,
       uniforms: {
         uColor: { value: new THREE.Color('#ffe8c0') },
-        uOpacity: { value: 0.38 },
+        uOpacity: { value: 0.36 },
+      },
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    });
+  }, []);
+
+  const diskGlowMaterial = useMemo(() => {
+    return new THREE.ShaderMaterial({
+      vertexShader: CORE_GLOW_VERTEX_SHADER,
+      fragmentShader: CORE_GLOW_FRAGMENT_SHADER,
+      uniforms: {
+        uColor: { value: new THREE.Color('#ffe0b0') },
+        uOpacity: { value: 0.28 },
       },
       transparent: true,
       depthWrite: false,
@@ -1122,14 +1152,20 @@ function GalacticCoreGlow({ galaxy }: CoreGlowProps) {
 
   return (
     <group>
-      {/* Core glow with continuous, smooth radial falloff */}
-      <mesh ref={meshRef} material={coreGlowMaterial}>
-        <planeGeometry args={[coreRadius * 4, coreRadius * 4]} />
+      {/* 1. In-plane horizontal disk glow strictly in galactic midplane (XZ) */}
+      <mesh ref={diskRef} rotation={[-Math.PI / 2, 0, 0]} material={diskGlowMaterial}>
+        <planeGeometry args={[coreRadius * 2.2, coreRadius * 2.2]} />
       </mesh>
+
+      {/* 2. Dynamically flattened oblate core glow (axis ratio q ~ 0.35, zero vertical column protrusion) */}
+      <mesh ref={billboardRef} material={coreGlowMaterial}>
+        <planeGeometry args={[coreRadius * 2.0, coreRadius * 2.0]} />
+      </mesh>
+
       {/* Central nucleus point light */}
       <pointLight
-        intensity={1.2}
-        distance={coreRadius * 8}
+        intensity={1.1}
+        distance={coreRadius * 4}
         decay={2}
         color="#ffe4c4"
       />
