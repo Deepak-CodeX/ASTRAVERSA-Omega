@@ -199,11 +199,46 @@ ASTRAVERSA Ω is developed through a series of **Missions** — focused mileston
 - [x] **Full Verification Passed:** TypeScript (`tsc -b`), linter (`oxlint`), production build (`npm run build`), and live Chrome DevTools runtime inspection passed cleanly.
 
 **Known Limitations:**
-- N-body gravitational perturbation on moons at extreme time multipliers ($1,000,000\times$) can induce numerical drift over simulation decades; analytic Keplerian rail fallback is planned for extreme time compression.
+- N-body gravitational perturbation on moons at extreme time multipliers ($1,000,000\times$) can induce numerical drift over simulation decades; resolved via the `ANALYTICAL_KEPLER` propagation mode introduced in P0 stabilization.
 - Visual rings for multi-satellite systems currently render in parent-centered coordinate space without hierarchical multi-body tidal resonance locking.
 
-**Next Milestone:**
-- Mission 005B — Planetary Surfaces & Geology (Procedural surface shaders, heightmaps, and atmospheric scattering).
+---
+
+## ✅ Mission 002B — OBSERVATIONAL GALAXY, REAL SOLAR SYSTEM & GALACTIC MORPHOLOGY CORRECTION
+### "Real Milky Way, NASA/JPL Ingestion & Ground-Truth Astrodynamics"
+
+**Status:** ✅ Complete
+
+**Objective:** Distinguish observed astronomical objects from procedural simulations, introduce a real searchable Milky Way and canonical Solar System, establish an astronomical catalogue and data ingestion architecture, and correct galactic bulge and disk morphology.
+
+**Deliverables:**
+- [x] **Real Milky Way Generator (`MilkyWayGenerator.ts`):** 100,000 ly physical diameter ($\sim 30.6\text{ kpc}$), 4 continuous spiral arms (Scutum-Centaurus, Perseus, Sagittarius, Norma) plus the local Orion-Cygnus Spur, with observed pitch angle $\psi \approx 13.1^\circ$ and thin/thick exponential disk scaling.
+- [x] **Galactic Morphology Correction:** Corrected central bulge from an unphysical vertically elongated prolate structure to an astronomically accurate oblate spheroid ($q = c/a = 0.35$) with a $28^\circ$ tilted central bar.
+- [x] **Galactocentric Solar Coordinates:** Positioned the Sun at $R_0 = 8.15\text{ kpc}$ ($26,580\text{ ly}$) from Sagittarius A*, elevated $z_0 \approx +20.8\text{ pc}$ above the galactic midplane along the inner Orion Spur.
+- [x] **Canonical Solar System (`canonicalSolarSystem.ts`):** Ground-truth model containing the Sun, all 8 major planets, 3 dwarf planets (Pluto, Ceres, Eris), and 19 major natural satellites with IAU/JPL DE440 mean orbital elements at J2000.
+- [x] **Astronomical Data Ingestion Adapters (`src/data/`):** Parsing and mapping pipelines for JPL Horizons (`jplHorizons.ts`), NASA Planetary Data System (`nasaPds.ts`), NASA Exoplanet Archive (`nasaExoplanetArchive.ts`), and ESA Gaia DR3 (`esaGaia.ts`) with robust offline cached ground-truth fallbacks.
+- [x] **Astronomical Provenance Framework (`AstronomicalProvenance.ts`):** Explicit classification distinguishing `OBSERVED`, `DERIVED`, and `PROCEDURAL` bodies with citation records, measurement epochs (J2000.0 / TDB), and data source tracking.
+- [x] **UI Navigation & Astronomical Search:** Real-time search bar in `App.tsx` supporting Sol, Earth, Sgr A*, and galactic objects, dual-mode galaxy toggle (`MILKY_WAY` vs `ANANTARA`), and one-click quick jump to our Solar System.
+- [x] **Dedicated Test Suite:** 43 tests passing across `canonicalSolarSystem.test.ts`, `milkyWayModel.test.ts`, `dataIngestion.test.ts`, and `astronomicalProvenance.test.ts`.
+
+---
+
+## ✅ P0 Engineering Stabilization — RESTORE SIMULATION INTEGRITY
+### "Authoritative State, Symplectic Integration & Propagation Modes"
+
+**Status:** ✅ Complete
+
+**Objective:** Eliminate the critical architectural and physical defects identified in the Engineering Integrity Audit to restore complete simulation integrity.
+
+**Deliverables:**
+- [x] **P0-1: Single Authoritative Simulation State:** Established `SimulationEngine.bodies` as the authoritative source of truth for all live celestial bodies in system view. The 3D viewport (`Scene.tsx`), inspectors (`UnifiedInfoPanel.tsx`), and editor (`SystemEditor.tsx`) consume `engine.bodies`. Redundant manual position/velocity synchronization loops in `App.tsx` were eliminated.
+- [x] **P0-2: Correct 4-Step Velocity-Verlet Integration:** Replaced incomplete leapfrog integration in `integrateNonKeplerianBodies()` and `integrateStep()` with the canonical 4-step Velocity-Verlet sequence ($r \to a \to v \to a$). Directly evaluated gravitational acceleration field ($m_1 = 1.0$), eliminating division-by-zero and `NaN` risks for massless test particles ($m = 0$) or lightweight probes.
+- [x] **P0-3: Strict Separation of Propagation Modes:** Introduced `PropagationMode` (`ANALYTICAL_KEPLER` vs `NUMERICAL_N_BODY`). In analytical mode (default), bound planets and moons propagate along exact Keplerian conics without evaluating discarded $O(N^2)$ mutual forces. In numerical mode, all bodies advance via Velocity-Verlet under mutual Newtonian gravity, with osculating elements synchronized to relative Cartesian state via `syncOsculatingElements()`.
+- [x] **Comprehensive Test Suite & Verification:**
+  - Dedicated stabilization test suite: `tests/simulationIntegrityP0.test.ts` (13 tests passing).
+  - Complete repository test suite: 25 test suites, 364 tests passing, 0 failures, 0 skipped.
+  - TypeScript typecheck (`tsc -b`): Clean with 0 errors.
+  - Production build (`vite build`): Clean with 0 errors.
 
 ---
 

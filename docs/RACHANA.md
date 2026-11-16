@@ -44,20 +44,31 @@ ASTRAVERSA Ω follows a strict separation of concerns across six subsystems. The
 ```
 Universe (seed)
   ↓
-Galaxy (ANANTARA α — 500k ly main stellar-body disk, 750k ly halo)
-  ↓
-  ├── SupermassiveBlackHole (ANANTARA A* at r = 0, configurable mass 4.154M to 40B M☉)
-  │     ├── AccretionDisk (4.8k particles, Keplerian rotation shader, Doppler beaming)
-  │     └── RelativisticJets (Bipolar collimated cones, standing shocks, synchrotron lobes)
-  ├── BarStructure (Triaxial bar, a = 19.93 kpc, b = 6.58 kpc, 28°)
-  ├── SpiralArm[] (4 continuous arms: Scutum-Centaurus, Perseus, Norma, Sagittarius)
-  ├── DiskStructure (Thin scale 1.5 kpc, Thick scale 4.5 kpc)
-  ├── StarCluster[] (deterministic from galaxy)
-  └── GalaxyStar[] (lightweight representation)
-        ↓ (on selection)
-      SolarSystem (generated from star seed)
-        ↓
-      CelestialBody[] (star + planets with physics state)
+Galaxy (Active Galaxy Mode: MILKY_WAY or ANANTARA)
+  ├── ANANTARA α (Procedural — 500k ly main stellar-body disk, 750k ly halo, seed 42)
+  │     ├── SupermassiveBlackHole (ANANTARA A* at r = 0, configurable mass 4.154M to 40B M☉)
+  │     │     ├── AccretionDisk (4.8k particles, Keplerian rotation shader, Doppler beaming)
+  │     │     └── RelativisticJets (Bipolar collimated cones, standing shocks, synchrotron lobes)
+  │     ├── BarStructure (Triaxial bar, a = 19.93 kpc, b = 6.58 kpc, 28°)
+  │     ├── SpiralArm[] (4 continuous arms: Scutum-Centaurus, Perseus, Norma, Sagittarius)
+  │     ├── DiskStructure (Thin scale 1.5 kpc, Thick scale 4.5 kpc)
+  │     ├── StarCluster[] (deterministic from galaxy)
+  │     └── GalaxyStar[] (procedural lightweight representation)
+  │           ↓ (on selection)
+  │         SolarSystem (procedural generated from star seed)
+  │           ↓
+  │         CelestialBody[] (star + planets with physics state)
+  │
+  └── MILKY WAY (Akashaganga — Real Observed, 100k ly disk, ~30.6 kpc)
+        ├── SupermassiveBlackHole (Sagittarius A* at r = 0, 4.154M M☉)
+        ├── BarStructure (a = 5.0 kpc, b = 1.5 kpc, 28° orientation) & Oblate Bulge (q = 0.35)
+        ├── SpiralArm[] (Scutum-Centaurus, Perseus, Sagittarius, Norma + local Orion Spur)
+        ├── DiskStructure (Thin scale 2.6 kpc, Thick scale 4.0 kpc)
+        └── GalaxyStar[] (Catalogue stars: Sol, Sirius, Alpha Centauri, Betelgeuse, etc.)
+              ↓ (on Sol selection)
+            Canonical Solar System (NASA/JPL Horizons ground-truth)
+              ↓
+            CelestialBody[] (Sun + 8 planets + 3 dwarf planets + 19 natural satellites)
 ```
 
 ---
@@ -95,41 +106,59 @@ Galaxy (ANANTARA α — 500k ly main stellar-body disk, 750k ly halo)
 
 ---
 
+### Data Ingestion (`src/data/`)
+
+**Purpose:** Astronomical catalogue parsing, API integration, and offline ephemerides (Mission 002B).
+
+| Component | Responsibility |
+|-----------|---------------|
+| `jplHorizons` | JPL Horizons REST API client for Solar System body ephemerides with IAU/JPL DE440 fallback constants |
+| `nasaPds` | NASA Planetary Data System parser and reference physical constants |
+| `nasaExoplanetArchive` | NASA Exoplanet Archive TAP API client for confirmed exoplanet parameters |
+| `esaGaia` | ESA Gaia DR3 astrometric catalogue client for stellar distances and kinematics |
+
+**Dependencies:** Astronomy (constants)
+
+---
+
 ### Universe (`src/universe/`)
 
-**Purpose:** Procedural generation and world representation.
+**Purpose:** Procedural generation, observational data integration, and world representation.
 
 | Component | Responsibility |
 |-----------|---------------|
 | `SeededRandom` | Deterministic PRNG with hierarchical seed derivation (`deriveSeed`, `fork`) |
-| `CelestialBody` | Core data structure for all celestial objects (with physics state and `StellarEvolutionState`) |
+| `AstronomicalProvenance` | Data provenance classification (`OBSERVED`, `DERIVED`, `PROCEDURAL`), citation strings, epochs (J2000.0 / TDB) |
+| `CelestialBody` | Core data structure for all celestial objects (with physics state, provenance, and `StellarEvolutionState`) |
 | `SolarSystemGenerator` | Procedural star + planet generation from seed (with isolated sub-PRNG stream for stellar evolution) |
+| `canonicalSolarSystem` | Observational model of the Solar System (Sun, 8 planets, 3 dwarf planets, 19 natural satellites) based on NASA/JPL data |
 | `Galaxy` | Domain model for galaxies, clusters, lightweight stars, and SMBH with radio jets |
-| `GalaxyGenerator` | Procedural SBbc barred spiral galaxy generation from seed (500k ly disk, 750k ly halo, triaxial bar, 4 continuous arms, dual disks, ANANTARA A* SMBH with `recalculateSupermassiveBlackHole`) |
-| `Universe` | Top-level container, navigation, view level management, generation entry point, and `setNucleusMass` runtime mass reconfiguration |
+| `GalaxyGenerator` | Procedural SBbc barred spiral galaxy generation from seed (500k ly disk, 750k ly halo, triaxial bar, ANANTARA A* SMBH) |
+| `MilkyWayGenerator` | Real Milky Way generator (100k ly disk, 4 continuous arms + Orion Spur, oblate bulge $q = 0.35$, solar location $R_0 = 8.15\text{ kpc}$) |
+| `Universe` | Top-level container, galaxy switching (`MILKY_WAY` vs `ANANTARA`), navigation, view level management, and system entry |
 
-**Dependencies:** Physics (Vector3), Astronomy (constants, stellar, stellarEvolution, planetary)
+**Dependencies:** Physics (Vector3), Astronomy (constants, stellar, stellarEvolution, planetary), Data (jplHorizons)
 
 **Key Design:**
 - `GalaxyStar` is lightweight (position, color, seed) for rendering thousands
-- `CelestialBody` is heavyweight (velocity, acceleration, physics state, stellar evolution) for simulation
-- Full `CelestialBody` objects are only created when entering a star system
+- `CelestialBody` is heavyweight (velocity, acceleration, physics state, stellar evolution, provenance) for simulation
+- Full `CelestialBody` objects are only created or loaded when entering a star system
 - Stellar evolution initialization derives from an isolated sub-stream (`rng.deriveSeed(888)`) to maintain 100% byte-for-byte invariance in planetary generation
 
 ---
 
 ### Engine (`src/engine/`)
 
-**Purpose:** Simulation lifecycle and time management.
+**Purpose:** Simulation lifecycle, time management, and authoritative state ownership (Missions P0 & P1-B).
 
 | Component | Responsibility |
 |-----------|---------------|
-| `SimulationClock` | Frame-rate-independent time with multipliers and substeps |
-| `SimulationEngine` | Physics integration loop, state orchestration, `advanceStellarAge(deltaYears)`, and `setStarAge(star, ageYears)` |
+| `SimulationClock` | Frame-rate-independent time with multipliers (up to $100,000\times$), substeps, and pause/resume |
+| `SimulationEngine` | Single authoritative owner of live celestial bodies in system view. Implements `PropagationMode` (`ANALYTICAL_KEPLER` vs `NUMERICAL_N_BODY`), 4-step Velocity-Verlet integration, direct gravitational acceleration field evaluation ($m_1 = 1.0$), osculating element synchronization (`syncOsculatingElements`), `advanceStellarAge`, and `setStarAge` |
 
-**Dependencies:** Physics (Vector3, gravity, integrator), Astronomy (constants, stellarEvolution), Universe (CelestialBody)
+**Dependencies:** Physics (Vector3, gravity, integrator, orbitalElements), Astronomy (constants, stellarEvolution, stellarPlanetaryCoupling), Universe (CelestialBody)
 
-**Note:** The engine is active when viewing a planetary system. Gravity integrates orbital mechanics while simulation time advances stellar evolution lifecycles.
+**Note:** The engine is the authoritative owner of mutable celestial-body state during system view. Rendering and UI inspectors consume `engine.bodies` directly.
 
 ---
 
@@ -191,19 +220,21 @@ App starts
 
 ### Galaxy → Star System Transition
 ```
-User clicks star
+User clicks star (or uses Astronomical Search / Quick Action)
   → Selected star index stored
-  → User clicks "Enter System"
-  → Universe.enterStarSystem(index) generates SolarSystem from star.seed
-  → SimulationEngine initialized with CelestialBody[]
-  → Engine starts (1× speed)
-  → Scene renders solar system view
+  → User clicks "Enter System" (or triggers direct jump)
+  → Universe.enterStarSystem(index):
+      → If star is Sol ('star-sun-sol'): loads createCanonicalSolarSystem() (NASA/JPL)
+      → Otherwise: generates SolarSystem procedurally from star.seed
+  → SimulationEngine initialized with system.bodies
+  → Engine starts (10,000× speed default)
+  → Scene renders system view using authoritative engine.bodies
 ```
 
 ### Solar System → Galaxy Transition
 ```
-User clicks "Back to Galaxy"
-  → Universe.exitStarSystem() clears system
+User clicks "Back to Galaxy" (or GALAXY view button)
+  → Universe.exitStarSystem() clears system reference
   → Engine paused
   → View switches back to GalaxyScene
   → Previously selected star remains highlighted
@@ -212,13 +243,21 @@ User clicks "Back to Galaxy"
 ### Simulation Loop (per frame, system view only)
 ```
 requestAnimationFrame fires
-  → useFrame callback receives wall-clock delta
-  → SimulationEngine.update(deltaMs)
-    → SimulationClock.tick(deltaMs) → substep array
-    → For each substep:
-      → Compute gravitational forces between all bodies
-      → Velocity Verlet integration updates positions/velocities
-  → React re-renders body positions in scene
+  → useFrame callback receives wall-clock delta (wallDeltaMs)
+  → SimulationEngine.update(wallDeltaMs)
+    → SimulationClock.tick(wallDeltaMs) → substep array & totalDt
+    → Branch by active PropagationMode:
+        ├── ANALYTICAL_KEPLER (default):
+        │     → propagateKeplerianBodies(totalDt) on exact conics (topological parent-child order)
+        │     → integrateNonKeplerianBodies(substeps) via 4-step Velocity-Verlet for free bodies
+        │     → Skips redundant O(N²) mutual force calculation each frame
+        │
+        └── NUMERICAL_N_BODY:
+              → For each substep dt:
+                  → integrateStep(dt) via 4-step Velocity-Verlet driven by mutual gravity
+              → syncOsculatingElements() updates Keplerian elements from (r, v) state vectors
+    → advanceStellarAge(deltaYears) advances stellar evolution lifecycles & coupling
+  → 3D Scene / PlanetRenderer / CelestialBodyRenderer consume authoritative engine.bodies
 ```
 
 ---
@@ -320,6 +359,87 @@ Planetary Physical State (M, R) + Stellar Insolation (L_star, d, A)
                 -> Airless Cryoworld | Airless Desolation | Glaciated Terrestrial
                    | Temperate Model Regime | Hyperthermic Runaway | Jovian Giant
 ```
+
+---
+
+## Astronomical Provenance & Data Ingestion Architecture (Mission 002B)
+
+### Provenance Classification Framework
+
+ASTRAVERSA Ω strictly demarcates empirical observations from synthetic generations via [`src/universe/AstronomicalProvenance.ts`](file:///d:/My%20Projects/ASTRAVERSA-%CE%A9/src/universe/AstronomicalProvenance.ts):
+
+| Provenance Category | Meaning | Examples in System |
+|---------------------|---------|---------------------|
+| `OBSERVED` | Direct measurements from scientific missions and astrometric catalogues | JPL Horizons orbital elements, IAU planetary radii/masses, Gaia DR3 stellar coordinates |
+| `DERIVED` | Quantities calculated deterministically from primary observational data via physical laws | Radiative equilibrium temperature, surface gravity, insolation flux, escape velocity |
+| `PROCEDURAL` | Synthesized via pseudo-random number generator algorithms from a deterministic seed | ANANTARA α stars, procedural planetary atmospheres, synthetic star clusters |
+
+Every canonical body carries an explicit `ProvenanceRecord` detailing data source (`DATA_SOURCE.NASA_JPL_HORIZONS`, `DATA_SOURCE.ESA_GAIA`, etc.), catalogue identifiers, measurement epochs (J2000.0 / TDB), and formal bibliographic citations.
+
+### Data Ingestion Pipeline & Offline Resiliency
+
+```
+Astronomical APIs (JPL Horizons, NASA PDS, Exoplanet Archive, ESA Gaia)
+  │
+  ├──> Client Data Adapters (`src/data/`)
+  │      ├──> Network Request (with browser CORS awareness)
+  │      └──> Verified Fallback Ephemeris Dictionary (IAU/JPL DE440 ground-truth)
+  │
+  └──> Canonical Solar System Model (`canonicalSolarSystem.ts`)
+         ├──> Sun, 8 Major Planets, 3 Dwarf Planets (Pluto, Ceres, Eris)
+         ├──> 19 Major Natural Satellites with parent linkage
+         └──> Rigorous Provenance & Physical Parameter Attribution
+```
+
+---
+
+## Orbital Propagation & Authoritative State Architecture (Mission P0)
+
+### Single Authoritative Simulation State
+
+To eliminate parallel state desynchronization, `SimulationEngine` is established as the sole authoritative owner of live celestial bodies in system view:
+
+```
+Galaxy Navigation (Universe.ts)
+  │  (on enterStarSystem)
+  └──> engine.initialize(system.bodies)
+         │
+         ├──> Authoritative Simulation State (`engine.bodies`)
+         │      ├── Vector3 position (meters, simulation frame)
+         │      ├── Vector3 velocity (m/s)
+         │      ├── Vector3 acceleration (m/s²)
+         │      └── Live Orbital & Environmental Properties
+         │
+         ├──> Viewport Rendering (`Scene.tsx`) consumes `engine.bodies`
+         ├──> UI Selection & Inspectors (`selectedBody`) consume `engine.getBody()`
+         └──> System Editor (`SystemEditor.tsx`) consumes `engine.bodies`
+```
+
+Manual cross-array position/velocity synchronization loops have been eliminated. Edits to physical or orbital properties in `SystemEditor` apply directly to the authoritative body via `engine.updateBodyProperties()` and `engine.updateBodyOrbit()`.
+
+### Propagation Modes (`PropagationMode`)
+
+```ts
+export const PropagationMode = {
+  ANALYTICAL_KEPLER: 'ANALYTICAL_KEPLER', // Exact 2-body Keplerian conic rails (default)
+  NUMERICAL_N_BODY: 'NUMERICAL_N_BODY',   // 4-step Velocity-Verlet driven by mutual gravity
+} as const;
+```
+
+1. **`ANALYTICAL_KEPLER` Mode (Default):**
+   - Bound planets and natural satellites advance along exact conic orbits via universal Kepler solver (`propagateKeplerOrbit`).
+   - Propagates in hierarchical topological order (parents before satellites) so that moon positions rigorously incorporate their moving parent planet ($r_{\text{world}} = r_{\text{parent}} + r_{\text{moon}}$).
+   - Skips redundant $O(N^2)$ mutual force calculations during normal frame ticks, guaranteeing zero CPU throttling and zero numerical drift over simulated millenia.
+   - Non-Keplerian free bodies (probes, rogue objects) are stepped via 4-step Velocity-Verlet.
+
+2. **`NUMERICAL_N_BODY` Mode:**
+   - All bodies are stepped using the canonical 4-step Velocity-Verlet integration algorithm:
+     $$\mathbf{r}(t + \Delta t) = \mathbf{r}(t) + \mathbf{v}(t)\Delta t + \frac{1}{2}\mathbf{a}(t)\Delta t^2$$
+     $$\mathbf{a}(t + \Delta t) = \sum_{j \ne i} \frac{G M_j}{(\|\mathbf{r}_{ij}\|^2 + \epsilon^2)^{3/2}} \mathbf{r}_{ij}$$
+     $$\mathbf{v}(t + \Delta t) = \mathbf{v}(t) + \frac{1}{2}\big(\mathbf{a}(t) + \mathbf{a}(t + \Delta t)\big)\Delta t$$
+     $$\mathbf{a}(t) \leftarrow \mathbf{a}(t + \Delta t)$$
+   - Evaluates the gravitational acceleration field directly by passing $m_1 = 1.0$ into `computeGravitationalForce()`, avoiding division by target mass and eliminating `0/0 = NaN` or `Infinity` instabilities for massless particles ($m = 0$) or lightweight probes.
+   - Continuously computes and synchronizes instantaneous osculating orbital elements via `syncOsculatingElements()` and `cartesianToOrbital()`, ensuring UI telemetry and orbit paths reflect current dynamical perturbations.
 
 ---
 
