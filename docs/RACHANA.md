@@ -1,4 +1,5 @@
 # रचना — RACHANA
+
 ## Architecture of ASTRAVERSA Ω
 
 ---
@@ -80,7 +81,7 @@ Galaxy (Active Galaxy Mode: MILKY_WAY or ANANTARA)
 **Purpose:** Core mathematical and physical primitives.
 
 | Component | Responsibility |
-|-----------|---------------|
+| ----------- | --------------- |
 | `Vector3` | 3D vector mathematics for simulation (independent of Three.js) |
 | `gravity` | Newtonian gravitational force computation |
 | `integrator` | Numerical integration (Velocity Verlet, Euler) |
@@ -94,7 +95,7 @@ Galaxy (Active Galaxy Mode: MILKY_WAY or ANANTARA)
 **Purpose:** Scientific models and astronomical constants.
 
 | Component | Responsibility |
-|-----------|---------------|
+| ----------- | --------------- |
 | `constants` | Physical constants (G, AU, kpc, solar mass, Stefan-Boltzmann $\sigma$, etc.) and unit conversions |
 | `stellar` | Main-sequence stellar classification and property derivation |
 | `stellarEvolution` | Piecewise stellar lifecycles, $\tau_{\text{MS}}$ scaling, Hayashi convective limit, Mestel cooling, and compact remnant endpoints |
@@ -111,7 +112,7 @@ Galaxy (Active Galaxy Mode: MILKY_WAY or ANANTARA)
 **Purpose:** Astronomical catalogue parsing, API integration, and offline ephemerides (Mission 002B).
 
 | Component | Responsibility |
-|-----------|---------------|
+| ----------- | --------------- |
 | `jplHorizons` | JPL Horizons REST API client for Solar System body ephemerides with IAU/JPL DE440 fallback constants |
 | `nasaPds` | NASA Planetary Data System parser and reference physical constants |
 | `nasaExoplanetArchive` | NASA Exoplanet Archive TAP API client for confirmed exoplanet parameters |
@@ -126,7 +127,7 @@ Galaxy (Active Galaxy Mode: MILKY_WAY or ANANTARA)
 **Purpose:** Procedural generation, observational data integration, and world representation.
 
 | Component | Responsibility |
-|-----------|---------------|
+| ----------- | --------------- |
 | `SeededRandom` | Deterministic PRNG with hierarchical seed derivation (`deriveSeed`, `fork`) |
 | `AstronomicalProvenance` | Data provenance classification (`OBSERVED`, `DERIVED`, `PROCEDURAL`), citation strings, epochs (J2000.0 / TDB) |
 | `CelestialBody` | Core data structure for all celestial objects (with physics state, provenance, and `StellarEvolutionState`) |
@@ -140,6 +141,7 @@ Galaxy (Active Galaxy Mode: MILKY_WAY or ANANTARA)
 **Dependencies:** Physics (Vector3), Astronomy (constants, stellar, stellarEvolution, planetary), Data (jplHorizons)
 
 **Key Design:**
+
 - `GalaxyStar` is lightweight (position, color, seed) for rendering thousands
 - `CelestialBody` is heavyweight (velocity, acceleration, physics state, stellar evolution, provenance) for simulation
 - Full `CelestialBody` objects are only created or loaded when entering a star system
@@ -152,7 +154,7 @@ Galaxy (Active Galaxy Mode: MILKY_WAY or ANANTARA)
 **Purpose:** Simulation lifecycle, time management, and authoritative state ownership (Missions P0 & P1-B).
 
 | Component | Responsibility |
-|-----------|---------------|
+| ----------- | --------------- |
 | `SimulationClock` | Frame-rate-independent time with multipliers (up to $100,000\times$), substeps, and pause/resume |
 | `SimulationEngine` | Single authoritative owner of live celestial bodies in system view. Implements `PropagationMode` (`ANALYTICAL_KEPLER` vs `NUMERICAL_N_BODY`), 4-step Velocity-Verlet integration, direct gravitational acceleration field evaluation ($m_1 = 1.0$), osculating element synchronization (`syncOsculatingElements`), `advanceStellarAge`, and `setStarAge` |
 
@@ -167,7 +169,7 @@ Galaxy (Active Galaxy Mode: MILKY_WAY or ANANTARA)
 **Purpose:** Visual representation only.
 
 | Component | Responsibility |
-|-----------|---------------|
+| ----------- | --------------- |
 | `GalaxyScene` | R3F canvas, camera, 9-waypoint interpolation (including 'bar', 'nucleus', and 'jets'), live telemetry, cosmic environment |
 | `GalaxyRenderer` | Layered GPU rendering: dual-profile stellar shader, golden bar population, leading bar dust shock lanes, H II nurseries, halo, and 7 layer visibility toggles (`disk`, `dust`, `halo`, `bulge`, `bar`, `accretion`, `jets`) |
 | `GalacticNucleusRenderer` | Relativistic nucleus container: event horizon shadow sphere, luminous photon ring, interactive reticle/hit-testing, and child high-energy renderers |
@@ -184,6 +186,7 @@ Galaxy (Active Galaxy Mode: MILKY_WAY or ANANTARA)
 **Critical Rule:** Rendering components read simulation state but NEVER modify it.
 
 **Rendering Strategy:**
+
 - Galaxy: Layered `Points` geometries with custom `ShaderMaterial`s (dual-profile diffraction core + airy halo, leading shock dust absorption, H II emission nebulae, Population II halo)
 - Galactic Nucleus: Central black shadow sphere ($r = 1.0$), photon orbit boundary ring ($r = 1.5$), Doppler-beamed gradient accretion disk, and selectable raycasting reticle
 - Accretion Disk: Custom shader with $\Omega(r) \propto r^{-1.25}$, orbital phase angle rotation, and Doppler color enhancement
@@ -198,7 +201,7 @@ Galaxy (Active Galaxy Mode: MILKY_WAY or ANANTARA)
 **Purpose:** User interaction and information display.
 
 | Component | Responsibility |
-|-----------|---------------|
+| ----------- | --------------- |
 | `App` | Application shell, navigation state, view routing, nucleus mass reconfiguration handler, and stellar evolution timeline orchestration |
 | `TimeControls` | Speed/pause controls, time display (system view only) |
 | `GalaxyInfoPanel` / `UnifiedInfoPanel` | Unified info panel with 9 waypoint jumps, 7 layer toggles, SMBH mass presets, full physical metadata readouts, and interactive Stellar Evolution Timeline controls (`+500 MYR`, `+1.0 GYR`, `+2.5 GYR`, `↺ RESET ZAMS`) |
@@ -210,6 +213,7 @@ Galaxy (Active Galaxy Mode: MILKY_WAY or ANANTARA)
 ## Data Flow
 
 ### Initialization
+
 ```
 App starts
   → Universe created with seed
@@ -219,6 +223,7 @@ App starts
 ```
 
 ### Galaxy → Star System Transition
+
 ```
 User clicks star (or uses Astronomical Search / Quick Action)
   → Selected star index stored
@@ -232,6 +237,7 @@ User clicks star (or uses Astronomical Search / Quick Action)
 ```
 
 ### Solar System → Galaxy Transition
+
 ```
 User clicks "Back to Galaxy" (or GALAXY view button)
   → Universe.exitStarSystem() clears system reference
@@ -241,6 +247,7 @@ User clicks "Back to Galaxy" (or GALAXY view button)
 ```
 
 ### Simulation Loop (per frame, system view only)
+
 ```
 requestAnimationFrame fires
   → useFrame callback receives wall-clock delta (wallDeltaMs)
@@ -265,7 +272,7 @@ requestAnimationFrame fires
 ## Unit System
 
 | Quantity | Internal Unit | Display Unit |
-|----------|--------------|-------------|
+| ---------- | -------------- | ------------- |
 | Distance | meters (m) | AU, km (system), kpc (galaxy) |
 | Mass | kilograms (kg) | M☉, M⊕ |
 | Time | seconds (s) | years, days, hours |
@@ -275,6 +282,7 @@ requestAnimationFrame fires
 | Galactic Distance | kiloparsecs (kpc) | kpc |
 
 **Rendering Scales:**
+
 - Solar System: 1 AU = 10 scene units
 - Galaxy: 1 kpc = 30 scene units
 
@@ -366,15 +374,17 @@ Planetary Physical State (M, R) + Stellar Insolation (L_star, d, A)
 
 ### Provenance Classification Framework
 
-ASTRAVERSA Ω strictly demarcates empirical observations from synthetic generations via [`src/universe/AstronomicalProvenance.ts`](file:///d:/My%20Projects/ASTRAVERSA-%CE%A9/src/universe/AstronomicalProvenance.ts):
+ASTRAVERSA Ω strictly demarcates empirical observations from synthetic generations in accordance with the [Official Scientific Source Integration Directive](file:///d:/My%20Projects/ASTRAVERSA-%CE%A9/docs/SCIENTIFIC_SOURCES.md) and [`src/universe/AstronomicalProvenance.ts`](file:///d:/My%20Projects/ASTRAVERSA-%CE%A9/src/universe/AstronomicalProvenance.ts):
 
 | Provenance Category | Meaning | Examples in System |
-|---------------------|---------|---------------------|
+| --------------------- | --------- | --------------------- |
 | `OBSERVED` | Direct measurements from scientific missions and astrometric catalogues | JPL Horizons orbital elements, IAU planetary radii/masses, Gaia DR3 stellar coordinates |
 | `DERIVED` | Quantities calculated deterministically from primary observational data via physical laws | Radiative equilibrium temperature, surface gravity, insolation flux, escape velocity |
+| `MODEL` | Properties produced by calibrated empirical or theoretical computational models | Kopparapu et al. (2013) habitable zone limits, 1D semi-grey greenhouse optical depths, stellar evolution tracks |
 | `PROCEDURAL` | Synthesized via pseudo-random number generator algorithms from a deterministic seed | ANANTARA α stars, procedural planetary atmospheres, synthetic star clusters |
+| `HYPOTHETICAL` | Explicitly theoretical, speculative, or unverified scenarios for scientific exploration | Interactive SMBH mass adjustments up to $40\times 10^9 M_\odot$, hypothetical exomoon configurations |
 
-Every canonical body carries an explicit `ProvenanceRecord` detailing data source (`DATA_SOURCE.NASA_JPL_HORIZONS`, `DATA_SOURCE.ESA_GAIA`, etc.), catalogue identifiers, measurement epochs (J2000.0 / TDB), and formal bibliographic citations.
+Every canonical body carries an explicit `ProvenanceRecord` detailing data source (`DATA_SOURCE.NASA_JPL_HORIZONS`, `DATA_SOURCE.ESA_GAIA`, etc.), catalogue identifiers, measurement epochs (J2000.0 / TDB), and formal bibliographic citations. Unknown parameters remain explicitly `null` rather than fabricated.
 
 ### Data Ingestion Pipeline & Offline Resiliency
 
