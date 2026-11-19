@@ -102,6 +102,7 @@ Galaxy (Active Galaxy Mode: MILKY_WAY or ANANTARA)
 | `stellarPlanetaryCoupling` | Radiative-equilibrium temperature, insolation flux, and Kopparapu et al. (2013) habitable zone |
 | `planetary` | Planetary type classification and orbital mechanics |
 | `planetaryEnvironment` | Surface gravity, escape velocity, atmospheric retention, 1D semi-grey greenhouse surface temperature, Clausius-Clapeyron water boiling curves, and physical thermal regimes (Mission 005A) |
+| `planetaryGeology` | Calibrated Digital Elevation Models (MGS MOLA MEGDR for Mars, LRO LOLA GDR for Moon), IAU WGPSN feature nomenclature catalogue, stratigraphic chronologies, haversine spatial queries, coordinate transforms (planetocentric to Cartesian/UV), and elevation sampling (Mission 005B) |
 
 **Dependencies:** None (pure data and functions)
 

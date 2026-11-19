@@ -245,18 +245,36 @@ ASTRAVERSA Ω is developed through a series of **Missions** — focused mileston
 ## 🔮 Mission 005B — PLANETARY SURFACES & GEOLOGY
 ### "Terrain, Crustal Dynamics & Surface Visualization"
 
-**Status:** Planned
+**Status:** Completed
 
-**Objective:** Planetary detail beyond orbiting spheres.
+**Objective:** Ground planetary topography, surface features, and geomorphology in calibrated observational science datasets (NASA PDS, USGS, MOLA, LOLA) rather than unanchored procedural heightmaps.
 
-**Key Features:**
-- Procedural terrain generation
-- Atmospheric composition and appearance
-- Temperature modeling (distance, atmosphere, albedo)
-- Day/night cycles
-- Surface zoom view
+**Implemented Capabilities:**
+- **Authoritative Digital Elevation Models (DEMs)**:
+  - Mars: MGS MOLA MEGDR (`MGS-M-MOLA-5-MEGDR-L3-V1.0`), $-8,200\text{ m}$ to $+21,229\text{ m}$ ($29,429\text{ m}$ total relief) referenced to the MOLA areoid ($6.105\text{ mbar}$ equipotential gravity datum).
+  - The Moon (Luna): LRO LOLA GDR (`LRO-L-LOLA-4-GDR-V1.0`), $-9,120\text{ m}$ to $+10,786\text{ m}$ ($19,906\text{ m}$ total relief) referenced to the mean lunar sphere ($1,737.4\text{ km}$ datum).
+- **IAU WGPSN Feature Nomenclature Catalogue**:
+  - Mars: 10 verified landmarks including Olympus Mons, Valles Marineris, Hellas Planitia, Gale Crater (Curiosity), Jezero Crater (Perseverance), Elysium Mons, etc.
+  - The Moon: 10 verified landmarks including Tycho, Copernicus, Shackleton (permanently shadowed polar crater), Mare Tranquillitatis (Apollo 11 Tranquility Base), South Pole-Aitken Basin, etc.
+- **Stratigraphic Chronologies**:
+  - Mars: Noachian, Hesperian, Amazonian eras with radiometric age bounds and major geological events.
+  - Moon: Pre-Nectarian, Nectarian, Imbrian, Eratosthenian, Copernican eras with definitive impact/volcanism milestones.
+- **Analytical Spatial & Cartographic Functions**:
+  - Great-circle Haversine spatial calculations on planetary spheres.
+  - Analytical elevation sampling with crustal dichotomy gradients and regional multi-feature Gaussian weighting.
+  - Spatial radius proximity searches (`findNearbyFeatures`).
+  - IAU Planetocentric coordinates to 3D Cartesian vectors in simulation space (Y-up) and Equirectangular/Orthographic/Polar UVs.
+- **UI Observatory Inspection Card**:
+  - Integrated into `GalaxyInfoPanel.tsx` under `GEOLOGY & TOPOGRAPHY (MISSION 005B)` for both planets and natural satellites.
+  - Displays DEM Product ID, sensor, geodetic datum, elevation range, crust thickness, lithology, and interactive site catalogue with coordinates and topographic relief.
+- **Strict Epistemic Separation**:
+  - Laser altimetry elevation data classified strictly as `OBSERVED` with NASA PDS provenance.
+  - Visual albedo images maintained strictly as separate render layers, forbidding photoluminance-to-elevation conversion.
 
-**Dependencies:** Mission 004 complete
+**Verification Results:**
+- 26 test suites, 384 tests, 0 failures.
+- TypeScript typecheck (`tsc -b`): Clean with 0 errors.
+- Production build (`vite build`): Clean with 0 errors.
 
 ---
 

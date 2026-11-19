@@ -25,6 +25,11 @@ import {
 import type { SolarSystem } from '../SolarSystemGenerator';
 import { orbitalToCartesian, type OrbitalElements } from '../../physics/orbitalElements';
 import { createObservedProvenance } from '../AstronomicalProvenance';
+import {
+  MARS_GEOLOGY,
+  MOON_GEOLOGY,
+  type PlanetaryGeology,
+} from '../../astronomy/planetaryGeology';
 
 // Degrees to radians helper
 const DEG2RAD = Math.PI / 180;
@@ -90,6 +95,7 @@ export function createCanonicalSolarSystem(): SolarSystem {
     albedo: number;
     habitabilityStatus: HabitabilityStatus;
     catalogNotes?: string;
+    geology?: PlanetaryGeology;
   }): CelestialBody {
     const aMeters = config.semiMajorAxisAU * AU;
     const incRad = config.inclinationDeg * DEG2RAD;
@@ -134,6 +140,7 @@ export function createCanonicalSolarSystem(): SolarSystem {
       seed: config.seed,
       parentId: sun.id,
       provenance,
+      geology: config.geology,
       planetProperties: {
         planetType: config.planetType,
         orbitalRadius: aMeters,
@@ -168,6 +175,7 @@ export function createCanonicalSolarSystem(): SolarSystem {
     argumentOfPeriapsisDeg: number;
     meanAnomalyDeg: number;
     catalogNotes?: string;
+    geology?: PlanetaryGeology;
   }): CelestialBody {
     const parent = config.parentPlanet;
     const aMeters = config.semiMajorAxisKm * 1000;
@@ -212,6 +220,7 @@ export function createCanonicalSolarSystem(): SolarSystem {
       seed: config.seed,
       parentId: parent.id,
       provenance,
+      geology: config.geology,
       moonProperties: {
         orbitalRadius: aMeters,
         orbitalPeriod: periodSeconds,
@@ -306,6 +315,7 @@ export function createCanonicalSolarSystem(): SolarSystem {
     argumentOfPeriapsisDeg: 318.15,
     meanAnomalyDeg: 135.0,
     catalogNotes: 'Earth natural satellite. Tidally locked, synchronous rotation.',
+    geology: MOON_GEOLOGY,
   });
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -328,6 +338,7 @@ export function createCanonicalSolarSystem(): SolarSystem {
     albedo: 0.25,
     habitabilityStatus: HabitabilityStatus.OPTIMISTIC_OUTER,
     catalogNotes: 'Fourth planet from Sun. Cold desert planet with iron-oxide surface and polar ice caps.',
+    geology: MARS_GEOLOGY,
   });
 
   // Mars Moons

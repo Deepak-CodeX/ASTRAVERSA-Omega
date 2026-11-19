@@ -8,3 +8,4 @@ export * from './planetary';
 export * from './stellarEvolution';
 export * from './stellarPlanetaryCoupling';
 export * from './planetaryEnvironment';
+export * from './planetaryGeology';

@@ -32,6 +32,7 @@ import {
   SECONDS_PER_DAY,
   SECONDS_PER_YEAR,
 } from '../astronomy/constants';
+import type { PlanetaryGeology } from '../astronomy/planetaryGeology';
 import type { ProvenanceRecord } from '../universe/AstronomicalProvenance';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1341,6 +1342,107 @@ function SystemStarInfo({
   );
 }
 
+function PlanetaryGeologyInfo({ geology }: { geology: PlanetaryGeology }) {
+  const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null);
+
+  const selectedFeature = selectedFeatureId
+    ? geology.majorFeatures.find((f) => f.id === selectedFeatureId)
+    : null;
+
+  return (
+    <>
+      <Divider />
+      <div style={styles.sectionHeader}>GEOLOGY & TOPOGRAPHY (MISSION 005B)</div>
+      <InfoRow label="DEM PRODUCT" value={geology.dem.productId} />
+      <InfoRow label="MISSION / SENSOR" value={`${geology.dem.mission} / ${geology.dem.instrument}`} />
+      <InfoRow label="VERTICAL DATUM" value={geology.dem.verticalDatum} />
+      <InfoRow
+        label="ELEVATION RANGE"
+        value={`${formatNumber(geology.dem.minElevationMeters, 0)} to +${formatNumber(geology.dem.maxElevationMeters, 0)} m`}
+        subvalue={`Relief: ${formatNumber(geology.dem.maxElevationMeters - geology.dem.minElevationMeters, 0)} m (±${geology.dem.verticalAccuracyMeters}m rms)`}
+      />
+      <InfoRow
+        label="CRUST THICKNESS"
+        value={`~${geology.meanCrustalThicknessKm} km`}
+      />
+      <InfoRow label="CRUST LITHOLOGY" value={geology.provinces[0]?.dominantLithology ?? 'Silicate / Basaltic'} />
+
+      <div style={{ marginTop: '8px', marginBottom: '4px' }}>
+        <span style={styles.sectionHeader}>FEATURE CATALOGUE ({geology.majorFeatures.length} SITES)</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '160px', overflowY: 'auto' }}>
+        {geology.majorFeatures.map((feat) => {
+          const isSelected = feat.id === selectedFeatureId;
+          return (
+            <div
+              key={feat.id}
+              onClick={() => setSelectedFeatureId(isSelected ? null : feat.id)}
+              style={{
+                padding: '4px 6px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                backgroundColor: isSelected ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                border: isSelected ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.08)',
+                fontSize: '11px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <div>
+                <span style={{ color: isSelected ? '#38bdf8' : '#e2e8f0', fontWeight: 600 }}>{feat.name}</span>
+                <span style={{ color: '#94a3b8', marginLeft: '6px', fontSize: '10px' }}>
+                  {feat.latitudeDeg >= 0 ? `${feat.latitudeDeg.toFixed(1)}°N` : `${(-feat.latitudeDeg).toFixed(1)}°S`},{' '}
+                  {feat.longitudeDeg.toFixed(1)}°E
+                </span>
+              </div>
+              <span style={{ color: '#a5f3fc', fontSize: '10px' }}>
+                {feat.diameterKm > 0 ? `Ø ${formatNumber(feat.diameterKm, 0)} km` : ''}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {selectedFeature && (
+        <div style={{ ...styles.disclaimerBox, borderColor: '#38bdf840', marginTop: '6px' }}>
+          <div style={{ ...styles.disclaimerTitle, color: '#38bdf8' }}>
+            {selectedFeature.name.toUpperCase()} ({selectedFeature.featureType.replace(/_/g, ' ')})
+          </div>
+          <div style={styles.disclaimerText}>{selectedFeature.description}</div>
+          {selectedFeature.elevationMeters !== undefined && (
+            <div style={{ ...styles.disclaimerText, color: '#e2e8f0', marginTop: '2px' }}>
+              • Topographic Elevation: {selectedFeature.elevationMeters > 0 ? '+' : ''}
+              {formatNumber(selectedFeature.elevationMeters, 0)} m relative to datum
+            </div>
+          )}
+          {selectedFeature.stratigraphicPeriod && (
+            <div style={{ ...styles.disclaimerText, color: '#94a3b8' }}>
+              • Stratigraphic Period: {selectedFeature.stratigraphicPeriod}
+            </div>
+          )}
+          <div style={{ ...styles.disclaimerText, color: '#64748b', fontSize: '9px', marginTop: '2px' }}>
+            Source: {selectedFeature.provenance.sourceArchive} ({selectedFeature.provenance.citation})
+          </div>
+        </div>
+      )}
+
+      <div style={styles.disclaimerBox}>
+        <div style={styles.disclaimerTitle}>TOPOGRAPHIC DATASET PROVENANCE</div>
+        <div style={styles.disclaimerText}>
+          • Calibrated laser altimetry dataset: {geology.dem.productId}.
+        </div>
+        <div style={styles.disclaimerText}>
+          • Coordinates referenced to IAU planetocentric frame (East longitude [0°–360°], North positive).
+        </div>
+        <div style={styles.disclaimerText}>
+          • Visual albedo images are separate layers and are not used as elevation displacement.
+        </div>
+      </div>
+    </>
+  );
+}
+
 function SystemPlanetInfo({ body }: { body: CelestialBody }) {
   const pp = body.planetProperties;
   const orbitalAU = (pp?.orbitalRadius ?? 0) / AU;
@@ -1524,6 +1626,8 @@ function SystemPlanetInfo({ body }: { body: CelestialBody }) {
           </div>
         </>
       )}
+
+      {body.geology && <PlanetaryGeologyInfo geology={body.geology} />}
     </>
   );
 }
@@ -1552,6 +1656,7 @@ function SystemMoonInfo({ body }: { body: CelestialBody }) {
           <InfoRow label="INCLINATION" value={`${((elements.inclination * 180) / Math.PI).toFixed(1)}°`} />
         </>
       )}
+      {body.geology && <PlanetaryGeologyInfo geology={body.geology} />}
     </>
   );
 }

@@ -20,6 +20,7 @@ import type {
   HabitabilityStatus,
 } from '../astronomy/stellarPlanetaryCoupling';
 import type { PlanetaryEnvironment } from '../astronomy/planetaryEnvironment';
+import type { PlanetaryGeology } from '../astronomy/planetaryGeology';
 import type { ProvenanceRecord } from './AstronomicalProvenance';
 
 /**
@@ -131,6 +132,9 @@ export interface CelestialBody {
   /** Provenance record establishing observational vs procedural status */
   provenance?: ProvenanceRecord;
 
+  /** Planetary geology, topography, and surface feature catalogue (Mission 005B) */
+  geology?: PlanetaryGeology;
+
   /** Star-specific properties (only for STAR type) */
   starProperties?: StarProperties;
 
@@ -156,6 +160,7 @@ export function createCelestialBody(params: {
   seed: number;
   parentId?: string;
   provenance?: ProvenanceRecord;
+  geology?: PlanetaryGeology;
   starProperties?: StarProperties;
   planetProperties?: PlanetProperties;
   moonProperties?: MoonProperties;
@@ -173,6 +178,7 @@ export function createCelestialBody(params: {
     seed: params.seed,
     parentId: params.parentId,
     provenance: params.provenance,
+    geology: params.geology,
     starProperties: params.starProperties,
     planetProperties: params.planetProperties,
     moonProperties: params.moonProperties,
