@@ -245,7 +245,7 @@ ASTRAVERSA Ω is developed through a series of **Missions** — focused mileston
 ## 🔮 Mission 005B — PLANETARY SURFACES & GEOLOGY
 ### "Terrain, Crustal Dynamics & Surface Visualization"
 
-**Status:** Completed
+**Status:** In Progress (Phase 1 Scientific Data & Analytical Architecture Completed; Phase 2 Runtime 3D Terrain Displacement Mesh Pending)
 
 **Objective:** Ground planetary topography, surface features, and geomorphology in calibrated observational science datasets (NASA PDS, USGS, MOLA, LOLA) rather than unanchored procedural heightmaps.
 

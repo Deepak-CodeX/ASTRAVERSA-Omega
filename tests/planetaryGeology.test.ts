@@ -29,7 +29,14 @@ describe('Mission 005B — Planetary Surfaces & Geology', () => {
       expect(mars.dem.maxElevationMeters).toBe(21229);
       expect(mars.dem.maxElevationMeters - mars.dem.minElevationMeters).toBe(29429);
       expect(mars.meanCrustalThicknessKm).toBeCloseTo(45, 0);
-      expect(mars.provenance.classification).toBe(AstronomicalProvenance.OBSERVED);
+      expect(mars.crustalThickness.uncertaintyRangeKm).toEqual([30, 72]);
+      expect(mars.dem.provenance.classification).toBe(AstronomicalProvenance.OBSERVED);
+      expect(mars.crustalThickness.provenance.classification).toBe(
+        AstronomicalProvenance.DERIVED_FROM_OBSERVATIONS
+      );
+      expect(mars.provenance.classification).toBe(
+        AstronomicalProvenance.DERIVED_FROM_OBSERVATIONS
+      );
       expect(mars.provenance.sourceArchive).toContain('NASA PDS Geosciences Node');
     });
 
@@ -46,7 +53,14 @@ describe('Mission 005B — Planetary Surfaces & Geology', () => {
       expect(moon.dem.maxElevationMeters).toBe(10786);
       expect(moon.dem.maxElevationMeters - moon.dem.minElevationMeters).toBe(19906);
       expect(moon.meanCrustalThicknessKm).toBeCloseTo(38, 0);
-      expect(moon.provenance.classification).toBe(AstronomicalProvenance.OBSERVED);
+      expect(moon.crustalThickness.uncertaintyRangeKm).toEqual([34, 43]);
+      expect(moon.dem.provenance.classification).toBe(AstronomicalProvenance.OBSERVED);
+      expect(moon.crustalThickness.provenance.classification).toBe(
+        AstronomicalProvenance.DERIVED_FROM_OBSERVATIONS
+      );
+      expect(moon.provenance.classification).toBe(
+        AstronomicalProvenance.DERIVED_FROM_OBSERVATIONS
+      );
       expect(moon.provenance.sourceArchive).toContain('NASA PDS Geosciences Node');
     });
 

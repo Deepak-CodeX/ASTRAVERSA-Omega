@@ -1363,7 +1363,8 @@ function PlanetaryGeologyInfo({ geology }: { geology: PlanetaryGeology }) {
       />
       <InfoRow
         label="CRUST THICKNESS"
-        value={`~${geology.meanCrustalThicknessKm} km`}
+        value={`~${geology.meanCrustalThicknessKm} km [MODEL: ${geology.crustalThickness.uncertaintyRangeKm[0]}–${geology.crustalThickness.uncertaintyRangeKm[1]} km]`}
+        subvalue={`Derived: ${geology.crustalThickness.provenance.citation?.split(';')[0] ?? 'InSight/GRAIL'}`}
       />
       <InfoRow label="CRUST LITHOLOGY" value={geology.provinces[0]?.dominantLithology ?? 'Silicate / Basaltic'} />
 
@@ -1428,9 +1429,12 @@ function PlanetaryGeologyInfo({ geology }: { geology: PlanetaryGeology }) {
       )}
 
       <div style={styles.disclaimerBox}>
-        <div style={styles.disclaimerTitle}>TOPOGRAPHIC DATASET PROVENANCE</div>
+        <div style={styles.disclaimerTitle}>SCIENTIFIC DATA CLASSIFICATION & PROVENANCE</div>
         <div style={styles.disclaimerText}>
-          • Calibrated laser altimetry dataset: {geology.dem.productId}.
+          • Topography (DEM): DIRECTLY OBSERVED ({geology.dem.productId}) via calibrated laser altimetry (datum: {geology.dem.verticalDatum}).
+        </div>
+        <div style={styles.disclaimerText}>
+          • Crustal Thickness: GEOPHYSICAL MODEL ESTIMATE ({geology.crustalThickness.methodology}). In situ constraint: {geology.crustalThickness.inSituConstraints}.
         </div>
         <div style={styles.disclaimerText}>
           • Coordinates referenced to IAU planetocentric frame (East longitude [0°–360°], North positive).

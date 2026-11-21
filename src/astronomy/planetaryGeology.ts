@@ -117,6 +117,18 @@ export interface DigitalElevationModel {
 }
 
 /**
+ * Model-derived planetary crustal thickness and geophysical interior structure.
+ */
+export interface CrustalThicknessModel {
+  meanThicknessKm: number;
+  uncertaintyRangeKm: [number, number];
+  regionalVariationDescription: string;
+  methodology: string;
+  inSituConstraints?: string;
+  provenance: ProvenanceRecord;
+}
+
+/**
  * Comprehensive planetary geology profile for a terrestrial planet or moon.
  */
 export interface PlanetaryGeology {
@@ -125,6 +137,8 @@ export interface PlanetaryGeology {
   meanRadiusKm: number;
   dem: DigitalElevationModel;
   crustalDichotomyDescription?: string;
+  crustalThickness: CrustalThicknessModel;
+  /** Convenience backward-compatible accessor for mean crustal thickness in km */
   meanCrustalThicknessKm: number;
   stratigraphicEras: StratigraphicEra[];
   provinces: GeomorphologicalProvince[];
@@ -167,6 +181,22 @@ export const MARS_GEOLOGY: PlanetaryGeology = {
   },
   crustalDichotomyDescription:
     'Pronounced crustal dichotomy separating the low-elevation, lightly cratered Northern Lowlands (crustal thickness ~32 km) from the high-standing, densely cratered Southern Highlands (crustal thickness ~58 km).',
+  crustalThickness: {
+    meanThicknessKm: 45,
+    uncertaintyRangeKm: [30, 72],
+    regionalVariationDescription:
+      'Northern Lowlands (~32 km) vs Southern Highlands (~58 km); Tharsis volcanic province reaches 65–85 km.',
+    methodology:
+      'Geophysical potential field inversion (MGS/MRO orbital gravity models GMM-3 / MGS95J combined with MOLA topography), constrained in situ by Mars InSight SEIS seismometer.',
+    inSituConstraints:
+      'NASA InSight SEIS receiver functions (Knapmeyer-Endrun et al. 2021): local crust thickness at Elysium Planitia is 20–39 km (2-layer vs 3-layer model).',
+    provenance: createDerivedProvenance(
+      'MARS-CRUST-MODEL-INSIGHT-GRAV',
+      'NASA InSight Science Team / NASA PDS Geophysics',
+      'Knapmeyer-Endrun et al. (2021), Science 373; Wieczorek et al. (2022), JGR Planets 127',
+      'Geophysical interior model derived from orbital gravimetry and in situ seismology; NOT an observed altimetric measurement.'
+    ),
+  },
   meanCrustalThicknessKm: 45,
   stratigraphicEras: [
     {
@@ -438,10 +468,11 @@ export const MARS_GEOLOGY: PlanetaryGeology = {
       ),
     },
   ],
-  provenance: createObservedProvenance(
+  provenance: createDerivedProvenance(
     'MOLA-MARS-GEOLOGY-MASTER',
     'NASA PDS Geosciences Node / USGS Astrogeology',
-    'Smith et al. (2001), Tanaka et al. (2014)'
+    'Smith et al. (2001), Knapmeyer-Endrun et al. (2021), Tanaka et al. (2014)',
+    'Composite planetary geology profile integrating observed laser altimetry (MOLA: OBSERVED) with geophysical interior structure models (InSight/gravity: DERIVED).'
   ),
 };
 
@@ -476,6 +507,22 @@ export const MOON_GEOLOGY: PlanetaryGeology = {
   },
   crustalDichotomyDescription:
     'Nearside-Farside asymmetry: the nearside is dominated by dark, low-elevation volcanic maria with thinner crust (~30 km), whereas the farside is dominated by ancient, heavily cratered anorthositic highlands with crustal thickness up to 60 km.',
+  crustalThickness: {
+    meanThicknessKm: 38,
+    uncertaintyRangeKm: [34, 43],
+    regionalVariationDescription:
+      'Nearside maria (~15–35 km, thinning to <10 km beneath Crisium and Orientale basins) vs Farside highlands (~45–65 km).',
+    methodology:
+      'High-resolution orbital gravity field spherical harmonics (GRAIL primary & extended mission) combined with LOLA topography, anchored by Apollo 12/14 seismic reanalyses.',
+    inSituConstraints:
+      'Apollo 12 and 14 passive seismic experiment re-evaluations (Lognonné et al. 2003, Weber et al. 2011).',
+    provenance: createDerivedProvenance(
+      'MOON-CRUST-MODEL-GRAIL',
+      'NASA GRAIL Science Team / NASA PDS Geosciences',
+      'Wieczorek et al. (2013), Science 339, 671–675',
+      'Geophysical interior model derived from orbital gravimetry and Apollo seismology; NOT an observed altimetric measurement.'
+    ),
+  },
   meanCrustalThicknessKm: 38,
   stratigraphicEras: [
     {
@@ -748,10 +795,11 @@ export const MOON_GEOLOGY: PlanetaryGeology = {
       ),
     },
   ],
-  provenance: createObservedProvenance(
+  provenance: createDerivedProvenance(
     'LOLA-MOON-GEOLOGY-MASTER',
     'NASA PDS Geosciences Node / LRO LOLA Science Team',
-    'Smith et al. (2010), Wilhelms (1987)'
+    'Smith et al. (2010), Wieczorek et al. (2013), Wilhelms (1987)',
+    'Composite lunar geology profile integrating observed laser altimetry (LOLA: OBSERVED) with geophysical interior structure models (GRAIL/Apollo: DERIVED).'
   ),
 };
 
